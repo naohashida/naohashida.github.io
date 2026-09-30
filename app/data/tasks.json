@@ -1,0 +1,9 @@
+{
+  "tasks": [
+    { "id": "task1", "title": "課題1", "prompt": "pa を3回読んでください", "minDurationSec": 3 },
+    { "id": "task2", "title": "課題2", "prompt": "ta を3回読んでください", "minDurationSec": 3 },
+    { "id": "task3", "title": "課題3", "prompt": "ka を3回読んでください", "minDurationSec": 3 },
+    { "id": "task4", "title": "課題4", "prompt": "下の文章を読んでください。", "textAsset": "texts/A.txt", "minDurationSec": 5 },
+    { "id": "task5", "title": "課題5", "prompt": "下の文章を読んでください。", "textAsset": "texts/B.txt", "minDurationSec": 5 }
+  ]
+}

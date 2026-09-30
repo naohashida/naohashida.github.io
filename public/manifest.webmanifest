@@ -1,0 +1,13 @@
+{
+  "name": "発音練習アプリ | Articulation Training",
+  "short_name": "発音練習",
+  "description": "成人の発音学習と反復練習を支援するWebアプリ",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f2e9",
+  "theme_color": "#164b48",
+  "lang": "ja",
+  "icons": [
+    { "src": "app-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
