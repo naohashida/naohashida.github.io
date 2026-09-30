@@ -48,6 +48,7 @@ const imageExtensions: Record<string, string> = {
 const defaultLog: PracticeLog = { doneDates: [], totalMs: 0, todayMs: 0, todayKey: "", items: {} };
 const baseUrl = import.meta.env.BASE_URL || "/";
 const assetUrl = (path: string) => `${baseUrl}${path.replace(/^\/+/, "")}`;
+const googlePlayUrl = "https://play.google.com/store/apps/details?id=jp.hashida.articulationtraining&hl=ja";
 
 const todayKey = () => new Date().toLocaleDateString("sv-SE");
 const formatMinutes = (ms: number) => (ms < 60_000 ? `${Math.max(0, Math.floor(ms / 1000))}秒` : `${Math.floor(ms / 60_000)}分`);
@@ -214,6 +215,19 @@ const navItems: { id: View; label: string }[] = [
   { id: "log", label: "記録" }, { id: "privacy", label: "ご案内" },
 ];
 
+function AndroidDownloadLink({ compact = false }: { compact?: boolean }) {
+  return (
+    <a className={`android-download${compact ? " compact" : ""}`} href={googlePlayUrl} target="_blank" rel="noreferrer">
+      <span className="android-download-icon" aria-hidden="true">▶</span>
+      <span className="android-download-copy">
+        <b>Androidをお使いの方へ</b>
+        <small>Google PlayからAndroidアプリ版をダウンロードできます</small>
+      </span>
+      <strong>Google Playで開く →</strong>
+    </a>
+  );
+}
+
 function Dashboard({ userName, log, sessions, onGo }: { userName: string; log: PracticeLog; sessions: AssessmentSession[]; onGo: (view: View) => void }) {
   const streak = calculateStreak(log.doneDates);
   const latest = sessions[0];
@@ -227,6 +241,7 @@ function Dashboard({ userName, log, sessions, onGo }: { userName: string; log: P
         </div>
         <img src={assetUrl("app-icon.png")} alt="" />
       </div>
+      <AndroidDownloadLink />
       <div className="home-menu">
         <button onClick={() => onGo("practice")}><span className="home-menu-icon">あ</span><div><b>発音練習</b><p>教材を選んで練習します</p></div><span>→</span></button>
         <button onClick={() => onGo("assessment")}><span className="home-menu-icon">◎</span><div><b>発音の判定</b><p>25音の聞こえ方を確認します</p></div><span>→</span></button>
@@ -403,7 +418,7 @@ function LogView({ log, sessions }: { log: PracticeLog; sessions: AssessmentSess
 }
 
 function PrivacyView() {
-  return <section className="view policy-view"><div className="eyebrow">INFORMATION</div><h1>ご利用案内と<br />プライバシー</h1><div className="policy-lead">本アプリは、成人の発音学習と反復練習を支援する教育用Webアプリです。</div><div className="policy-grid"><article><span>01</span><h2>マイクの使用</h2><p>録音または発音判定を開始したときだけマイクを使用します。ブラウザから許可を求められた場合に、ご自身で選択できます。</p></article><article><span>02</span><h2>データの保存</h2><p>ユーザー名、練習履歴、判定履歴、録音音声は、このブラウザの端末内に保存されます。サーバーへ自動送信しません。</p></article><article><span>03</span><h2>課題の共有</h2><p>課題提出で共有操作を選んだ場合に限り、端末の共有機能またはメールを使って録音を送信できます。送信前に内容を確認できます。</p></article><article><span>04</span><h2>大切なお知らせ</h2><p>表示される判定は音声認識結果に基づく学習上の目安です。医療上の診断や治療を目的とするものではありません。</p></article></div><div className="contact-card"><div><span>CONTACT</span><h2>お問い合わせ</h2></div><a href="mailto:hashida1223@gmail.com">hashida1223@gmail.com →</a></div></section>;
+  return <section className="view policy-view"><div className="eyebrow">INFORMATION</div><h1>ご利用案内と<br />プライバシー</h1><div className="policy-lead">本アプリは、成人の発音学習と反復練習を支援する教育用Webアプリです。</div><AndroidDownloadLink compact /><div className="policy-grid"><article><span>01</span><h2>マイクの使用</h2><p>録音または発音判定を開始したときだけマイクを使用します。ブラウザから許可を求められた場合に、ご自身で選択できます。</p></article><article><span>02</span><h2>データの保存</h2><p>ユーザー名、練習履歴、判定履歴、録音音声は、このブラウザの端末内に保存されます。サーバーへ自動送信しません。</p></article><article><span>03</span><h2>課題の共有</h2><p>課題提出で共有操作を選んだ場合に限り、端末の共有機能またはメールを使って録音を送信できます。送信前に内容を確認できます。</p></article><article><span>04</span><h2>大切なお知らせ</h2><p>表示される判定は音声認識結果に基づく学習上の目安です。医療上の診断や治療を目的とするものではありません。</p></article></div><div className="contact-card"><div><span>CONTACT</span><h2>お問い合わせ</h2></div><a href="mailto:hashida1223@gmail.com">hashida1223@gmail.com →</a></div></section>;
 }
 
 export default function Home() {
