@@ -32,6 +32,28 @@ type PracticeLog = {
 };
 type AssessmentResult = { target: string; candidates: string[]; correct: boolean };
 type AssessmentSession = { date: string; correct: number; total: number; results: AssessmentResult[] };
+type BrowserSpeechRecognitionResult = {
+  readonly isFinal: boolean;
+  readonly length: number;
+  [index: number]: { transcript: string };
+};
+type BrowserSpeechRecognitionEvent = {
+  readonly results: { readonly length: number; [index: number]: BrowserSpeechRecognitionResult };
+};
+type BrowserSpeechRecognition = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  maxAlternatives: number;
+  onsoundstart: (() => void) | null;
+  onspeechstart: (() => void) | null;
+  onspeechend: (() => void) | null;
+  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  abort: () => void;
+};
 
 const categories = (practiceJson as { categories: PracticeCategory[] }).categories;
 const tasks = (tasksJson as { tasks: Task[] }).tasks;
@@ -39,6 +61,33 @@ const assessmentSounds = [
   "た", "だ", "に", "ひ", "み", "り", "び", "く", "る", "け", "て", "れ", "げ",
   "で", "と", "ご", "ど", "きゃ", "しゃ", "ちゃ", "じゃ", "しゅ", "じゅ", "きょ", "ちょ",
 ];
+const assessmentAnswerAliases: Record<string, string[]> = {
+  "た": ["た", "田", "多", "他", "太", "タ", "ター"],
+  "だ": ["だ", "打", "ダ", "ダー"],
+  "に": ["に", "二", "荷", "煮", "似", "兄", "ニ", "ニー", "2", "２"],
+  "ひ": ["ひ", "日", "火", "非", "比", "陽", "ヒ", "ヒー"],
+  "み": ["み", "見", "身", "実", "美", "三", "ミ", "ミー", "3", "３"],
+  "り": ["り", "利", "理", "里", "李", "梨", "リ", "リー"],
+  "び": ["び", "美", "尾", "微", "ビ", "ビー", "B", "b"],
+  "く": ["く", "区", "句", "九", "苦", "久", "空", "食う", "ク", "クー", "9", "９"],
+  "る": ["る", "留", "流", "ル", "ルー"],
+  "け": ["け", "家", "毛", "気", "計", "系", "経", "ケ", "ケー"],
+  "て": ["て", "手", "テ", "テー"],
+  "れ": ["れ", "例", "礼", "零", "レ", "レー", "0", "０"],
+  "げ": ["げ", "下", "芸", "ゲ", "ゲー"],
+  "で": ["で", "出", "デ", "デー"],
+  "と": ["と", "戸", "都", "斗", "十", "ト", "トー"],
+  "ご": ["ご", "五", "語", "後", "碁", "号", "午後", "ゴ", "ゴー", "5", "５"],
+  "ど": ["ど", "土", "度", "ド", "ドー"],
+  "きゃ": ["きゃ", "きゃあ", "キャ", "キャー"],
+  "しゃ": ["しゃ", "車", "社", "者", "写", "謝", "シャ", "シャー"],
+  "ちゃ": ["ちゃ", "茶", "ちゃあ", "チャ", "チャー"],
+  "じゃ": ["じゃ", "じゃあ", "ジャ", "ジャー"],
+  "しゅ": ["しゅ", "しゅう", "主", "酒", "種", "朱", "州", "週", "シュ", "シュー"],
+  "じゅ": ["じゅ", "じゅう", "十", "銃", "樹", "授", "柔", "ジュ", "ジュー", "10", "１０"],
+  "きょ": ["きょ", "きょう", "今日", "京", "教", "強", "協", "競", "鏡", "キョ", "キョー"],
+  "ちょ": ["ちょ", "ちょう", "超", "町", "長", "蝶", "庁", "調", "チョ", "チョー"],
+};
 const imageExtensions: Record<string, string> = {
   ansei: "png", ansei_position: "jpg", bou: "jpg", hekomi: "jpg", k_sound_position: "jpg",
   ka: "png", osara: "jpg", r_sound_position: "jpg", ra: "png", relax: "jpg",
@@ -59,14 +108,20 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 function normalizeJapanese(value: string) {
-  return value.normalize("NFKC").toLowerCase().replace(/[\s。、,.!！?？・ー～~]/g, "")
+  return value.normalize("NFKC").toLowerCase()
+    .replaceAll("10", "じゅう").replaceAll("0", "れい").replaceAll("2", "に")
+    .replaceAll("3", "み").replaceAll("5", "ご").replaceAll("9", "く")
+    .replace(/[\s\u3000、。,.!！?？・ー～~-]/g, "")
     .replace(/[ァ-ヶ]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0x60));
 }
 
 function isMatch(candidate: string, target: string) {
   const heard = normalizeJapanese(candidate);
-  const expected = normalizeJapanese(target);
-  return heard === expected || heard.includes(expected);
+  if (!heard) return false;
+  const answers = [...(assessmentAnswerAliases[target] || []), target]
+    .map(normalizeJapanese)
+    .filter(Boolean);
+  return answers.some((answer) => heard === answer || heard.includes(answer) || answer.includes(heard));
 }
 
 function openAudioDb(): Promise<IDBDatabase> {
@@ -324,8 +379,20 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
   const [index, setIndex] = useState(0);
   const [results, setResults] = useState<AssessmentResult[]>([]);
   const [listening, setListening] = useState(false);
+  const [needsRetry, setNeedsRetry] = useState(false);
+  const [attemptVersion, setAttemptVersion] = useState(0);
   const [message, setMessage] = useState("表示された音を、ひとつずつ発音します。");
   const [supported, setSupported] = useState(false);
+  const soundsRef = useRef<string[]>([]);
+  const indexRef = useRef(0);
+  const resultsRef = useRef<AssessmentResult[]>([]);
+  const listeningRef = useRef(false);
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const partialCandidatesRef = useRef<string[]>([]);
+  const detectedSpeechRef = useRef(false);
+  const retryCountRef = useRef(0);
+  const attemptResolvedRef = useRef(true);
+  const noResultTimerRef = useRef<number | null>(null);
   const finished = sounds.length > 0 && results.length === sounds.length;
 
   useEffect(() => {
@@ -333,43 +400,196 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
     setSupported(Boolean(scope.SpeechRecognition || scope.webkitSpeechRecognition));
   }, []);
 
+  const clearNoResultTimer = useCallback(() => {
+    if (noResultTimerRef.current !== null) {
+      window.clearTimeout(noResultTimerRef.current);
+      noResultTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => {
+    attemptResolvedRef.current = true;
+    clearNoResultTimer();
+    recognitionRef.current?.abort();
+  }, [clearNoResultTimer]);
+
   function startAssessment() {
-    setSounds([...assessmentSounds].sort(() => Math.random() - 0.5)); setIndex(0); setResults([]); setMessage("マイクを押して発音してください。");
+    const shuffled = [...assessmentSounds];
+    for (let i = shuffled.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    soundsRef.current = shuffled;
+    indexRef.current = 0;
+    resultsRef.current = [];
+    retryCountRef.current = 0;
+    partialCandidatesRef.current = [];
+    detectedSpeechRef.current = false;
+    attemptResolvedRef.current = true;
+    setSounds(shuffled);
+    setIndex(0);
+    setResults([]);
+    setNeedsRetry(false);
+    setAttemptVersion((value) => value + 1);
+    setMessage("表示された音を発音してください。自動で録音を開始します。");
   }
 
-  function listen() {
-    type RecognitionResult = { [index: number]: { transcript: string }; length: number };
-    type RecognitionEvent = { results: { [index: number]: RecognitionResult } };
-    type Recognition = { lang: string; interimResults: boolean; maxAlternatives: number; onresult: ((event: RecognitionEvent) => void) | null; onerror: (() => void) | null; onend: (() => void) | null; start: () => void };
-    type RecognitionCtor = new () => Recognition;
+  const recordResult = useCallback((candidates: string[]) => {
+    const target = soundsRef.current[indexRef.current];
+    if (!target) return;
+    attemptResolvedRef.current = true;
+    clearNoResultTimer();
+    listeningRef.current = false;
+    setListening(false);
+    setNeedsRetry(false);
+    partialCandidatesRef.current = [];
+    detectedSpeechRef.current = false;
+    retryCountRef.current = 0;
+
+    const result = { target, candidates, correct: candidates.some((candidate) => isMatch(candidate, target)) };
+    const next = [...resultsRef.current, result];
+    resultsRef.current = next;
+    setResults(next);
+
+    if (indexRef.current >= soundsRef.current.length - 1) {
+      const session = { date: new Date().toISOString(), correct: next.filter((item) => item.correct).length, total: next.length, results: next };
+      onSaved(session);
+      setMessage("判定が終了しました。お疲れさまでした。");
+    } else {
+      indexRef.current += 1;
+      setIndex(indexRef.current);
+      setMessage(result.correct ? "認識できました。次の音へ進みます。" : `「${candidates[0] || "認識なし"}」として記録し、次の音へ進みます。`);
+    }
+  }, [clearNoResultTimer, onSaved]);
+
+  const markRetry = useCallback((retryMessage: string) => {
+    attemptResolvedRef.current = true;
+    clearNoResultTimer();
+    listeningRef.current = false;
+    setListening(false);
+    setNeedsRetry(true);
+    partialCandidatesRef.current = [];
+    detectedSpeechRef.current = false;
+    setMessage(retryMessage);
+  }, [clearNoResultTimer]);
+
+  const retryNoRecognition = useCallback(() => {
+    attemptResolvedRef.current = true;
+    clearNoResultTimer();
+    listeningRef.current = false;
+    setListening(false);
+    partialCandidatesRef.current = [];
+    detectedSpeechRef.current = false;
+    if (retryCountRef.current < 1) {
+      retryCountRef.current += 1;
+      setNeedsRetry(false);
+      setMessage("認識結果が取れませんでした。もう一度自動で録音します。");
+      setAttemptVersion((value) => value + 1);
+    } else {
+      recordResult([]);
+    }
+  }, [clearNoResultTimer, recordResult]);
+
+  const listen = useCallback((resetRetryCount = false) => {
+    if (listeningRef.current || !soundsRef.current.length) return;
+    type RecognitionCtor = new () => BrowserSpeechRecognition;
     const scope = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
     const Constructor = scope.SpeechRecognition || scope.webkitSpeechRecognition;
-    if (!Constructor) return;
+    if (!Constructor) {
+      markRetry("このブラウザでは音声認識を利用できません。");
+      return;
+    }
+
     const recognition = new Constructor();
-    recognition.lang = "ja-JP"; recognition.interimResults = false; recognition.maxAlternatives = 10;
-    recognition.onresult = (event) => {
-      const alternatives = event.results[0];
-      const candidates = Array.from({ length: alternatives.length }, (_, i) => alternatives[i].transcript);
-      const target = sounds[index];
-      const result = { target, candidates, correct: candidates.some((candidate) => isMatch(candidate, target)) };
-      const next = [...results, result];
-      setResults(next); setListening(false);
-      if (index + 1 < sounds.length) { setIndex(index + 1); setMessage(result.correct ? "認識できました。次の音へ進みます。" : `「${candidates[0] || "認識なし"}」と聞こえました。次へ進みます。`); }
-      else {
-        const session = { date: new Date().toISOString(), correct: next.filter((item) => item.correct).length, total: next.length, results: next };
-        onSaved(session); setMessage("判定が終了しました。お疲れさまでした。");
-      }
+    recognitionRef.current = recognition;
+    if (resetRetryCount) retryCountRef.current = 0;
+    partialCandidatesRef.current = [];
+    detectedSpeechRef.current = false;
+    attemptResolvedRef.current = false;
+    listeningRef.current = true;
+    setListening(true);
+    setNeedsRetry(false);
+    setMessage("聞き取り中です。表示された音を発音してください。");
+
+    const beginNoResultTimer = () => {
+      detectedSpeechRef.current = true;
+      clearNoResultTimer();
+      noResultTimerRef.current = window.setTimeout(() => {
+        if (attemptResolvedRef.current || partialCandidatesRef.current.length) return;
+        attemptResolvedRef.current = true;
+        recognition.abort();
+        recordResult([]);
+      }, 5000);
     };
-    recognition.onerror = () => { setListening(false); setMessage("うまく聞き取れませんでした。もう一度お試しください。"); };
-    recognition.onend = () => setListening(false);
-    setListening(true); setMessage("聞いています…"); recognition.start();
-  }
+
+    recognition.lang = "ja-JP";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.maxAlternatives = 10;
+    recognition.onsoundstart = beginNoResultTimer;
+    recognition.onspeechstart = beginNoResultTimer;
+    recognition.onspeechend = () => { if (!attemptResolvedRef.current) setMessage("判定中です。"); };
+    recognition.onresult = (event) => {
+      if (attemptResolvedRef.current) return;
+      const candidates: string[] = [];
+      let hasFinalResult = false;
+      for (let resultIndex = 0; resultIndex < event.results.length; resultIndex += 1) {
+        const alternatives = event.results[resultIndex];
+        if (alternatives.isFinal) hasFinalResult = true;
+        for (let alternativeIndex = 0; alternativeIndex < alternatives.length; alternativeIndex += 1) {
+          const transcript = alternatives[alternativeIndex].transcript.trim();
+          if (transcript) candidates.push(transcript);
+        }
+      }
+      if (candidates.length) {
+        partialCandidatesRef.current = Array.from(new Set([...partialCandidatesRef.current, ...candidates]));
+        setMessage(hasFinalResult ? "判定中です。" : "音声を認識中です。");
+      }
+      if (hasFinalResult) recordResult(partialCandidatesRef.current);
+    };
+    recognition.onerror = (event) => {
+      if (attemptResolvedRef.current) return;
+      if (event.error === "aborted") return;
+      if (event.error === "no-speech" || event.error === "no-match") {
+        if (partialCandidatesRef.current.length) recordResult(partialCandidatesRef.current);
+        else if (detectedSpeechRef.current) retryNoRecognition();
+        else markRetry("音声を検出できませんでした。もう一度録音してください。");
+        return;
+      }
+      const errorMessages: Record<string, string> = {
+        "audio-capture": "録音エラーです。もう一度試してください。",
+        "not-allowed": "マイクの使用が許可されていません。ブラウザの設定を確認してください。",
+        "service-not-allowed": "音声認識の使用が許可されていません。ブラウザの設定を確認してください。",
+        network: "通信エラーです。端末の音声認識設定を確認してください。",
+        "language-not-supported": "日本語の音声認識を利用できません。",
+      };
+      markRetry(errorMessages[event.error] || "音声認識エラーです。もう一度試してください。");
+    };
+    recognition.onend = () => {
+      if (attemptResolvedRef.current) return;
+      if (partialCandidatesRef.current.length) recordResult(partialCandidatesRef.current);
+      else if (detectedSpeechRef.current) retryNoRecognition();
+      else markRetry("音声を検出できませんでした。もう一度録音してください。");
+    };
+
+    try {
+      recognition.start();
+    } catch {
+      markRetry("音声認識を開始できませんでした。もう一度試してください。");
+    }
+  }, [clearNoResultTimer, markRetry, recordResult, retryNoRecognition]);
+
+  useEffect(() => {
+    if (!sounds.length || finished || listening || needsRetry) return;
+    const timer = window.setTimeout(() => listen(), 450);
+    return () => window.clearTimeout(timer);
+  }, [attemptVersion, finished, index, listen, listening, needsRetry, sounds.length]);
 
   const correctCount = results.filter((result) => result.correct).length;
   return (
     <section className="view assessment-view">
       <div className="page-header"><div><div className="eyebrow">VOICE CHECK</div><h1>発音の判定</h1><p>音声認識を使って、25音の聞こえ方を確認します。</p></div></div>
-      {!sounds.length ? <div className="assessment-intro"><div className="assessment-mark">◎</div><h2>声の現在地を確認しましょう</h2><p>結果は医療上の診断ではなく、練習のための目安です。静かな場所で、マイクの使用を許可してください。</p>{!supported && <div className="notice">このブラウザは音声判定に対応していません。ChromeまたはEdgeでお試しください。</div>}<button className="button primary" disabled={!supported} onClick={startAssessment}>判定をはじめる</button></div> : finished ? <div className="result-card"><span>今回の結果</span><strong>{Math.round((correctCount / results.length) * 100)}<small>%</small></strong><p>{results.length}音中 {correctCount}音を認識できました</p><div className="result-sounds">{results.map((result) => <span className={result.correct ? "ok" : "retry"} key={result.target}>{result.target}<small>{result.correct ? "○" : "△"}</small></span>)}</div><button className="button primary" onClick={startAssessment}>もう一度判定する</button></div> : <div className="assessment-stage"><div className="assessment-topline"><span>{index + 1} / {sounds.length}</span><div><i style={{ width: `${((index + 1) / sounds.length) * 100}%` }} /></div></div><p className="assessment-prompt">この音を発音してください</p><div className="target-sound">{sounds[index]}</div><button className={`listen-button ${listening ? "listening" : ""}`} onClick={listen} disabled={listening}><span>{listening ? "•••" : "●"}</span>{listening ? "聞いています" : "マイクを押して発音"}</button><p className="assessment-message">{message}</p></div>}
+      {!sounds.length ? <div className="assessment-intro"><div className="assessment-mark">◎</div><h2>声の現在地を確認しましょう</h2><p>結果は医療上の診断ではなく、練習のための目安です。静かな場所で、マイクの使用を許可してください。</p>{!supported && <div className="notice">このブラウザは音声判定に対応していません。ChromeまたはEdgeでお試しください。</div>}<button className="button primary" disabled={!supported} onClick={startAssessment}>判定をはじめる</button></div> : finished ? <div className="result-card"><span>今回の結果</span><strong>{Math.round((correctCount / results.length) * 100)}<small>%</small></strong><p>{results.length}音中 {correctCount}音を認識できました</p><div className="result-sounds">{results.map((result) => <span className={result.correct ? "ok" : "retry"} key={result.target}>{result.target}<small>{result.correct ? "○" : "△"}</small></span>)}</div><button className="button primary" onClick={startAssessment}>もう一度判定する</button></div> : <div className="assessment-stage"><div className="assessment-topline"><span>{index + 1} / {sounds.length}</span><div><i style={{ width: `${((index + 1) / sounds.length) * 100}%` }} /></div></div><p className="assessment-prompt">この音を発音してください</p><div className="target-sound">{sounds[index]}</div><button className={`listen-button ${listening ? "listening" : ""}`} onClick={() => listen(true)} disabled={listening || !needsRetry}><span>{listening ? "•••" : needsRetry ? "●" : "…"}</span>{listening ? "聞いています" : needsRetry ? "もう一度録音" : "自動録音を準備中"}</button><p className="assessment-message">{message}</p><button className="button ghost" onClick={startAssessment} disabled={listening}>最初からやり直す</button></div>}
     </section>
   );
 }
