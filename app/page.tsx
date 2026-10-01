@@ -403,6 +403,7 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
   const partialCandidatesRef = useRef<string[]>([]);
   const detectedSpeechRef = useRef(false);
   const retryCountRef = useRef(0);
+  const contextualBiasEnabledRef = useRef(true);
   const attemptResolvedRef = useRef(true);
   const noResultTimerRef = useRef<number | null>(null);
   const finished = sounds.length > 0 && results.length === sounds.length;
@@ -550,13 +551,28 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
     recognition.continuous = false;
     recognition.maxAlternatives = 10;
     const PhraseConstructor = scope.SpeechRecognitionPhrase || scope.webkitSpeechRecognitionPhrase;
-    if ("phrases" in recognition && PhraseConstructor) {
+    let contextualBiasApplied = false;
+    if (contextualBiasEnabledRef.current && "phrases" in recognition && PhraseConstructor) {
       try {
         recognition.phrases = assessmentBiasPhrases.map((phrase) => new PhraseConstructor(phrase, 4));
+        contextualBiasApplied = true;
       } catch {
         // Contextual biasing is optional and is not implemented by every browser yet.
       }
     }
+    const restartWithoutContextualBias = () => {
+      contextualBiasEnabledRef.current = false;
+      attemptResolvedRef.current = true;
+      clearNoResultTimer();
+      listeningRef.current = false;
+      setListening(false);
+      setRecognitionReady(false);
+      setNeedsRetry(false);
+      partialCandidatesRef.current = [];
+      detectedSpeechRef.current = false;
+      setMessage("このブラウザに合わせて音声認識を再準備しています。");
+      setAttemptVersion((value) => value + 1);
+    };
     const announceReady = () => {
       if (attemptResolvedRef.current) return;
       setRecognitionReady(true);
@@ -588,6 +604,10 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
     recognition.onerror = (event) => {
       if (attemptResolvedRef.current) return;
       if (event.error === "aborted") return;
+      if (event.error === "phrases-not-supported" && contextualBiasApplied) {
+        restartWithoutContextualBias();
+        return;
+      }
       if (event.error === "no-speech" || event.error === "no-match") {
         if (partialCandidatesRef.current.length) recordResult(partialCandidatesRef.current);
         else if (detectedSpeechRef.current) retryNoRecognition();
@@ -613,7 +633,8 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
     try {
       recognition.start();
     } catch {
-      markRetry("音声認識を開始できませんでした。もう一度試してください。");
+      if (contextualBiasApplied) restartWithoutContextualBias();
+      else markRetry("音声認識を開始できませんでした。もう一度試してください。");
     }
   }, [clearNoResultTimer, markRetry, recordResult, retryNoRecognition]);
 
