@@ -40,11 +40,18 @@ type BrowserSpeechRecognitionResult = {
 type BrowserSpeechRecognitionEvent = {
   readonly results: { readonly length: number; [index: number]: BrowserSpeechRecognitionResult };
 };
+type BrowserSpeechRecognitionPhrase = {
+  readonly phrase: string;
+  readonly boost: number;
+};
 type BrowserSpeechRecognition = {
   lang: string;
   interimResults: boolean;
   continuous: boolean;
   maxAlternatives: number;
+  phrases?: BrowserSpeechRecognitionPhrase[];
+  onstart: (() => void) | null;
+  onaudiostart: (() => void) | null;
   onsoundstart: (() => void) | null;
   onspeechstart: (() => void) | null;
   onspeechend: (() => void) | null;
@@ -88,6 +95,10 @@ const assessmentAnswerAliases: Record<string, string[]> = {
   "きょ": ["きょ", "きょう", "今日", "京", "教", "強", "協", "競", "鏡", "キョ", "キョー"],
   "ちょ": ["ちょ", "ちょう", "超", "町", "長", "蝶", "庁", "調", "チョ", "チョー"],
 };
+const assessmentBiasPhrases = Array.from(new Set([
+  ...assessmentSounds,
+  ...Object.values(assessmentAnswerAliases).flat(),
+]));
 const imageExtensions: Record<string, string> = {
   ansei: "png", ansei_position: "jpg", bou: "jpg", hekomi: "jpg", k_sound_position: "jpg",
   ka: "png", osara: "jpg", r_sound_position: "jpg", ra: "png", relax: "jpg",
@@ -379,6 +390,7 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
   const [index, setIndex] = useState(0);
   const [results, setResults] = useState<AssessmentResult[]>([]);
   const [listening, setListening] = useState(false);
+  const [recognitionReady, setRecognitionReady] = useState(false);
   const [needsRetry, setNeedsRetry] = useState(false);
   const [attemptVersion, setAttemptVersion] = useState(0);
   const [message, setMessage] = useState("表示された音を、ひとつずつ発音します。");
@@ -429,6 +441,7 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
     setSounds(shuffled);
     setIndex(0);
     setResults([]);
+    setRecognitionReady(false);
     setNeedsRetry(false);
     setAttemptVersion((value) => value + 1);
     setMessage("表示された音を発音してください。自動で録音を開始します。");
@@ -441,6 +454,7 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
     clearNoResultTimer();
     listeningRef.current = false;
     setListening(false);
+    setRecognitionReady(false);
     setNeedsRetry(false);
     partialCandidatesRef.current = [];
     detectedSpeechRef.current = false;
@@ -467,6 +481,7 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
     clearNoResultTimer();
     listeningRef.current = false;
     setListening(false);
+    setRecognitionReady(false);
     setNeedsRetry(true);
     partialCandidatesRef.current = [];
     detectedSpeechRef.current = false;
@@ -478,6 +493,7 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
     clearNoResultTimer();
     listeningRef.current = false;
     setListening(false);
+    setRecognitionReady(false);
     partialCandidatesRef.current = [];
     detectedSpeechRef.current = false;
     if (retryCountRef.current < 1) {
@@ -493,7 +509,13 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
   const listen = useCallback((resetRetryCount = false) => {
     if (listeningRef.current || !soundsRef.current.length) return;
     type RecognitionCtor = new () => BrowserSpeechRecognition;
-    const scope = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
+    type RecognitionPhraseCtor = new (phrase: string, boost?: number) => BrowserSpeechRecognitionPhrase;
+    const scope = window as unknown as {
+      SpeechRecognition?: RecognitionCtor;
+      webkitSpeechRecognition?: RecognitionCtor;
+      SpeechRecognitionPhrase?: RecognitionPhraseCtor;
+      webkitSpeechRecognitionPhrase?: RecognitionPhraseCtor;
+    };
     const Constructor = scope.SpeechRecognition || scope.webkitSpeechRecognition;
     if (!Constructor) {
       markRetry("このブラウザでは音声認識を利用できません。");
@@ -508,8 +530,9 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
     attemptResolvedRef.current = false;
     listeningRef.current = true;
     setListening(true);
+    setRecognitionReady(false);
     setNeedsRetry(false);
-    setMessage("聞き取り中です。表示された音を発音してください。");
+    setMessage("マイクを準備しています。少しお待ちください。");
 
     const beginNoResultTimer = () => {
       detectedSpeechRef.current = true;
@@ -526,6 +549,21 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
     recognition.interimResults = true;
     recognition.continuous = false;
     recognition.maxAlternatives = 10;
+    const PhraseConstructor = scope.SpeechRecognitionPhrase || scope.webkitSpeechRecognitionPhrase;
+    if ("phrases" in recognition && PhraseConstructor) {
+      try {
+        recognition.phrases = assessmentBiasPhrases.map((phrase) => new PhraseConstructor(phrase, 4));
+      } catch {
+        // Contextual biasing is optional and is not implemented by every browser yet.
+      }
+    }
+    const announceReady = () => {
+      if (attemptResolvedRef.current) return;
+      setRecognitionReady(true);
+      setMessage("準備ができました。表示された音を発音してください。");
+    };
+    recognition.onstart = announceReady;
+    recognition.onaudiostart = announceReady;
     recognition.onsoundstart = beginNoResultTimer;
     recognition.onspeechstart = beginNoResultTimer;
     recognition.onspeechend = () => { if (!attemptResolvedRef.current) setMessage("判定中です。"); };
@@ -589,7 +627,7 @@ function AssessmentView({ onSaved }: { onSaved: (session: AssessmentSession) => 
   return (
     <section className="view assessment-view">
       <div className="page-header"><div><div className="eyebrow">VOICE CHECK</div><h1>発音の判定</h1><p>音声認識を使って、25音の聞こえ方を確認します。</p></div></div>
-      {!sounds.length ? <div className="assessment-intro"><div className="assessment-mark">◎</div><h2>声の現在地を確認しましょう</h2><p>結果は医療上の診断ではなく、練習のための目安です。静かな場所で、マイクの使用を許可してください。</p>{!supported && <div className="notice">このブラウザは音声判定に対応していません。ChromeまたはEdgeでお試しください。</div>}<button className="button primary" disabled={!supported} onClick={startAssessment}>判定をはじめる</button></div> : finished ? <div className="result-card"><span>今回の結果</span><strong>{Math.round((correctCount / results.length) * 100)}<small>%</small></strong><p>{results.length}音中 {correctCount}音を認識できました</p><div className="result-sounds">{results.map((result) => <span className={result.correct ? "ok" : "retry"} key={result.target}>{result.target}<small>{result.correct ? "○" : "△"}</small></span>)}</div><button className="button primary" onClick={startAssessment}>もう一度判定する</button></div> : <div className="assessment-stage"><div className="assessment-topline"><span>{index + 1} / {sounds.length}</span><div><i style={{ width: `${((index + 1) / sounds.length) * 100}%` }} /></div></div><p className="assessment-prompt">この音を発音してください</p><div className="target-sound">{sounds[index]}</div><button className={`listen-button ${listening ? "listening" : ""}`} onClick={() => listen(true)} disabled={listening || !needsRetry}><span>{listening ? "•••" : needsRetry ? "●" : "…"}</span>{listening ? "聞いています" : needsRetry ? "もう一度録音" : "自動録音を準備中"}</button><p className="assessment-message">{message}</p><button className="button ghost" onClick={startAssessment} disabled={listening}>最初からやり直す</button></div>}
+      {!sounds.length ? <div className="assessment-intro"><div className="assessment-mark">◎</div><h2>声の現在地を確認しましょう</h2><p>結果は医療上の診断ではなく、練習のための目安です。静かな場所で、マイクの使用を許可してください。</p>{!supported && <div className="notice">このブラウザは音声判定に対応していません。ChromeまたはEdgeでお試しください。</div>}<button className="button primary" disabled={!supported} onClick={startAssessment}>判定をはじめる</button></div> : finished ? <div className="result-card"><span>今回の結果</span><strong>{Math.round((correctCount / results.length) * 100)}<small>%</small></strong><p>{results.length}音中 {correctCount}音を認識できました</p><div className="result-sounds">{results.map((result) => <span className={result.correct ? "ok" : "retry"} key={result.target}>{result.target}<small>{result.correct ? "○" : "△"}</small></span>)}</div><button className="button primary" onClick={startAssessment}>もう一度判定する</button></div> : <div className="assessment-stage"><div className="assessment-topline"><span>{index + 1} / {sounds.length}</span><div><i style={{ width: `${((index + 1) / sounds.length) * 100}%` }} /></div></div><p className="assessment-prompt">この音を発音してください</p><div className="target-sound">{sounds[index]}</div><button className={`listen-button ${listening ? "listening" : ""}`} onClick={() => listen(true)} disabled={listening || !needsRetry}><span>{listening ? recognitionReady ? "•••" : "…" : needsRetry ? "●" : "…"}</span>{listening ? recognitionReady ? "聞いています" : "マイク準備中" : needsRetry ? "もう一度録音" : "自動録音を準備中"}</button><p className="assessment-message">{message}</p><button className="button ghost" onClick={startAssessment} disabled={listening}>最初からやり直す</button></div>}
     </section>
   );
 }
