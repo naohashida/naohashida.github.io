@@ -560,26 +560,83 @@ function MealSectionView({ onGo }: { onGo: (view: View) => void }) {
 // ---------------- 発音練習（wordTest対応） ----------------
 
 function PracticeView({ onPractice, onPraise }: { onPractice: (id: string, title: string, ms: number) => void; onPraise: () => void }) {
-  const [categoryId, setCategoryId] = useState(categories[0].id);
+  // Android版と同じ3段階選択：大項目 → 中項目 → 小項目 → 詳細
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [groupId, setGroupId] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ group: PracticeGroup; index: number } | null>(null);
-  const category = categories.find((item) => item.id === categoryId) || categories[0];
+
+  const category = categories.find((item) => item.id === categoryId) || null;
+
   if (selected) {
-    return <PracticeDetail group={selected.group} index={selected.index} onIndex={(index) => setSelected({ ...selected, index })} onBack={() => { onPraise(); setSelected(null); }} onPractice={onPractice} onPraise={onPraise} />;
+    return (
+      <PracticeDetail
+        group={selected.group}
+        index={selected.index}
+        onIndex={(index) => setSelected({ ...selected, index })}
+        onBack={() => { onPraise(); setSelected(null); }}
+        onPractice={onPractice}
+        onPraise={onPraise}
+      />
+    );
   }
+
+  if (category && groupId) {
+    const group = category.groups.find((g) => g.id === groupId);
+    if (!group) { setGroupId(null); return null; }
+    return (
+      <section className="view">
+        <button className="back-button" onClick={() => setGroupId(null)}>← 中項目へ戻る</button>
+        <div className="page-header"><div><div className="eyebrow">PRACTICE</div><h1>小項目を選択</h1><p>{category.title} ／ {group.title}</p></div><div className="count-badge"><strong>{group.items.length}</strong><span>項目</span></div></div>
+        <div className="drill-list">
+          {group.items.map((item, index) => (
+            <button key={item.id} onClick={() => setSelected({ group, index })}>
+              <span className="lesson-number">{String(index + 1).padStart(2, "0")}</span>
+              <span className="lesson-title">{item.title}</span>
+              <span className="lesson-meta">{item.wordTest ? "単語テスト" : item.videoRaw ? "動画あり" : "練習"}</span>
+              <span className="round-arrow">→</span>
+            </button>
+          ))}
+        </div>
+        <div className="lesson-nav">
+          <button className="button ghost" onClick={() => setGroupId(null)}>戻る</button>
+          <button className="button primary" onClick={() => setSelected({ group, index: 0 })}>順番に開始（1から）</button>
+        </div>
+      </section>
+    );
+  }
+
+  if (category) {
+    return (
+      <section className="view">
+        <button className="back-button" onClick={() => setCategoryId(null)}>← 大項目へ戻る</button>
+        <div className="page-header"><div><div className="eyebrow">PRACTICE</div><h1>中項目を選択</h1><p>{category.title}</p></div></div>
+        <div className="drill-list">
+          {category.groups.map((group) => (
+            <button key={group.id} onClick={() => setGroupId(group.id)}>
+              <span className="lesson-title">{group.title}</span>
+              <span className="lesson-meta">{group.items.length}項目</span>
+              <span className="round-arrow">→</span>
+            </button>
+          ))}
+        </div>
+        <div className="lesson-nav">
+          <button className="button ghost" onClick={() => setCategoryId(null)}>戻る</button>
+          <button className="button primary" onClick={() => { setGroupId(category.groups[0]?.id || null); }}>最初から開始</button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="view">
       <div className="page-header"><div><div className="eyebrow">PRACTICE LIBRARY</div><h1>発音練習</h1><p>練習したい音や動きを選んでください。</p></div><div className="count-badge"><strong>80</strong><span>練習項目</span></div></div>
-      <div className="category-tabs" role="tablist" aria-label="練習カテゴリ">
-        {categories.map((item) => <button role="tab" aria-selected={item.id === categoryId} className={item.id === categoryId ? "active" : ""} onClick={() => setCategoryId(item.id)} key={item.id}>{item.title}</button>)}
-      </div>
-      <div className="practice-groups">
-        {category.groups.map((group) => (
-          <article className="practice-group" key={group.id}>
-            <div className="group-header"><div><span>{category.title}</span><h2>{group.title}</h2></div><span>{group.items.length}項目</span></div>
-            <div className="lesson-list">
-              {group.items.map((item, index) => <button key={item.id} onClick={() => setSelected({ group, index })}><span className="lesson-number">{String(index + 1).padStart(2, "0")}</span><span className="lesson-title">{item.title}</span><span className="lesson-meta">{item.wordTest ? "単語テスト" : item.videoRaw ? "動画あり" : item.blocks?.some((b) => b.type === "image") ? "図解あり" : "練習"}</span><span className="round-arrow">→</span></button>)}
-            </div>
-          </article>
+      <div className="drill-list drill-categories">
+        {categories.map((item) => (
+          <button key={item.id} onClick={() => setCategoryId(item.id)}>
+            <span className="lesson-title">{item.title}</span>
+            <span className="lesson-meta">{item.groups.reduce((n, g) => n + g.items.length, 0)}項目</span>
+            <span className="round-arrow">→</span>
+          </button>
         ))}
       </div>
     </section>
@@ -590,35 +647,54 @@ function PracticeDetail({ group, index, onIndex, onBack, onPractice, onPraise }:
   const item = group.items[index];
   const assetText = useAssetText(item.textAsset);
   const started = useRef(Date.now());
+  const [fontSize, setFontSize] = useState(20);
+  useEffect(() => {
+    setFontSize(Number(localStorage.getItem("articulation:practice-font") || 20));
+  }, []);
   useEffect(() => { started.current = Date.now(); return () => onPractice(item.id, item.title, Date.now() - started.current); }, [item.id, item.title, onPractice]);
   if (item.wordTest) {
     const set = claritySets[item.wordTestSet || "ta"] || claritySets.ta;
     return <WordClarityTestView set={set} onBack={onBack} onFinished={onPraise} />;
   }
   const blocks = item.blocks || [];
+  const changeFont = (delta: number) => {
+    const next = Math.min(36, Math.max(16, fontSize + delta));
+    setFontSize(next);
+    localStorage.setItem("articulation:practice-font", String(next));
+  };
   return (
     <section className="view lesson-view">
-      <button className="back-button" onClick={onBack}>← 一覧へ戻る</button>
       <div className="lesson-progress"><span style={{ width: `${((index + 1) / group.items.length) * 100}%` }} /></div>
       <div className="lesson-kicker">{group.title}　{index + 1} / {group.items.length}</div>
       <h1>{item.title}</h1>
-      <div className="lesson-layout">
-        <article className="lesson-content">
-          {blocks.length ? blocks.map((block, blockIndex) => {
-            const name = block.content || block.resName || "";
-            if (block.type === "image") return <img className="instruction-image" src={assetUrl(`assets/images/${name}.${imageExtensions[name] || "jpg"}`)} alt={`${item.title}の説明図`} key={blockIndex} />;
-            if (block.type === "video") return <video controls playsInline src={assetUrl(`assets/videos/${name}.mp4`)} key={blockIndex} />;
-            return <div className="instruction-text" dangerouslySetInnerHTML={{ __html: name }} key={blockIndex} />;
-          }) : <>
-            <div className="instruction-text" dangerouslySetInnerHTML={{ __html: item.instruction }} />
-            {assetText && <div className="reading-text">{assetText}</div>}
-            {[item.image, item.image2, item.image3].filter(Boolean).map((name) => <img className="instruction-image" src={assetUrl(`assets/images/${name}.${imageExtensions[name!] || "jpg"}`)} alt={`${item.title}の説明図`} key={name} />)}
-            {item.videoRaw && <video controls playsInline src={assetUrl(`assets/videos/${item.videoRaw}.mp4`)} />}
-          </>}
-        </article>
-        <aside className="practice-panel"><span className="panel-label">自分の声を確認</span><h3>録音して聴いてみる</h3><p>お手本を意識して、ゆっくり発音しましょう。</p><AudioRecorder storageKey={`practice:${item.id}`} /></aside>
+      <div className="lesson-topbar">
+        <div className="font-controls">
+          <span>文字サイズ：{fontSize}</span>
+          <button className="button ghost small" disabled={fontSize <= 16} onClick={() => changeFont(-2)}>小さく</button>
+          <button className="button ghost small" disabled={fontSize >= 36} onClick={() => changeFont(2)}>大きく</button>
+        </div>
       </div>
-      <div className="lesson-nav"><button className="button ghost" disabled={index === 0} onClick={() => onIndex(index - 1)}>← 前へ</button><button className="button primary" onClick={() => index < group.items.length - 1 ? onIndex(index + 1) : onBack()}>{index < group.items.length - 1 ? "次へ →" : "一覧へ戻る"}</button></div>
+      {item.allowRecording && (
+        <div className="lesson-recorder"><AudioRecorder storageKey={`practice:${item.id}`} /></div>
+      )}
+      <article className="lesson-content">
+        {blocks.length ? blocks.map((block, blockIndex) => {
+          const name = block.content || block.resName || "";
+          if (block.type === "image") return <img className="instruction-image" src={assetUrl(`assets/images/${name}.${imageExtensions[name] || "jpg"}`)} alt={`${item.title}の説明図`} key={blockIndex} />;
+          if (block.type === "video") return <video controls playsInline src={assetUrl(`assets/videos/${name}.mp4`)} key={blockIndex} />;
+          return <div className="instruction-text" style={{ fontSize }} dangerouslySetInnerHTML={{ __html: name }} key={blockIndex} />;
+        }) : <>
+          <div className="instruction-text" style={{ fontSize }} dangerouslySetInnerHTML={{ __html: item.instruction }} />
+          {assetText && <div className="reading-text" style={{ fontSize }}>{assetText}</div>}
+          {[item.image, item.image2, item.image3].filter(Boolean).map((name) => <img className="instruction-image" src={assetUrl(`assets/images/${name}.${imageExtensions[name!] || "jpg"}`)} alt={`${item.title}の説明図`} key={name} />)}
+          {item.videoRaw && <video controls playsInline src={assetUrl(`assets/videos/${item.videoRaw}.mp4`)} />}
+        </>}
+      </article>
+      <div className="lesson-nav">
+        <button className="button ghost" disabled={index === 0} onClick={() => onIndex(index - 1)}>← 前へ</button>
+        <button className="button primary" disabled={index >= group.items.length - 1} onClick={() => onIndex(index + 1)}>次へ →</button>
+        <button className="button ghost" onClick={onBack}>一覧へ</button>
+      </div>
     </section>
   );
 }

@@ -319,3 +319,20 @@ h1, h2, h3, b, strong, button, .button, .eyebrow, .lesson-title, .chip, .sidebar
   .praise-card img { width: 160px; height: 126px; }
   .praise-title { font-size: 34px; }
 }
+
+/* Android準拠の3段階選択リスト */
+.drill-list { display: grid; gap: 12px; margin-top: 26px; }
+.drill-list > button { display: grid; grid-template-columns: 44px 1fr auto 38px; align-items: center; gap: 14px; padding: 18px 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); text-align: left; cursor: pointer; box-shadow: 0 4px 14px rgba(34, 54, 49, .04); transition: .2s ease; }
+.drill-list > button:hover { border-color: var(--teal); box-shadow: 0 8px 24px rgba(34, 54, 49, .09); }
+.drill-categories > button { grid-template-columns: 1fr auto 38px; }
+.drill-categories .lesson-title { font-size: 19px; }
+.drill-list .lesson-meta { color: var(--muted); font-size: 11px; }
+.lesson-topbar { display: flex; justify-content: flex-end; margin-top: 18px; }
+.font-controls { display: inline-flex; align-items: center; gap: 10px; background: var(--white); border: 1px solid var(--line); border-radius: 99px; padding: 8px 10px 8px 18px; font-size: 12px; }
+.lesson-recorder { margin: 18px 0 0; background: var(--white); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; }
+.lesson-nav .button.ghost:disabled { opacity: .35; }
+@media (max-width: 720px) {
+  .drill-list > button { grid-template-columns: 34px 1fr 32px; padding: 15px 14px; }
+  .drill-list .lesson-meta { display: none; }
+  .drill-categories > button { grid-template-columns: 1fr 32px; }
+}
