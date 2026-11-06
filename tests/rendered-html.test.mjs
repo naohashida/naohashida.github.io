@@ -10,11 +10,11 @@ async function render() {
   }, { waitUntil() {}, passThroughOnException() {} });
 }
 
-test("発音練習アプリをサーバーレンダリングする", async () => {
+test("アプリをサーバーレンダリングする", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /発音練習アプリ/);
-  assert.match(html, /Articulation Training/);
+  assert.match(html, /発音練習・食事の自己管理/);
+  assert.match(html, /Articulation &amp; Meal Self-Care/);
   assert.doesNotMatch(html, /codex-preview|SkeletonPreview/);
 });
