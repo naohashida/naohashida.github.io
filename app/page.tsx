@@ -1362,11 +1362,12 @@ function MealGuidanceView() {
       <div className="notice">実際の食形態は、担当の言語聴覚士・管理栄養士等の指示に従ってください。</div>
       <div className="guide-list">
         {dietGuides.map((g) => (
-          <article className="guide-card" key={g.code}>
-            <div className="guide-head"><span className="guide-code">{g.code}</span><h2>{g.name}</h2></div>
+          <article className="guide-card" key={g.code} style={g.color ? { background: g.color + "55" } : undefined}>
+            <div className="guide-head"><span className="guide-code" style={{ background: g.color || "#fff" }}>{g.code}</span><h2>{g.name}</h2></div>
             <p><b>形態：</b>{g.form}</p>
             <p><b>例：</b>{g.example}</p>
             <p><b>ポイント：</b>{g.tips}</p>
+            {!g.color && <small>※この区分は早見表上、色で区別されません。</small>}
           </article>
         ))}
       </div>
@@ -1512,6 +1513,55 @@ function calculateStreak(dates: string[]) {
   return count;
 }
 
+const calendarStamps = ["stamp_mataane", "stamp_kanryou", "stamp_sugoi", "stamp_ganbatte", "stamp_yokudekimashita", "stamp_ganbarimashita", "stamp_ok"];
+
+/** 2週間前の日曜日から5週間（35日）の週揃いグリッド。実施日はランダムなカエルスタンプ */
+function PracticeCalendar({ doneDates }: { doneDates: string[] }) {
+  const doneSet = useMemo(() => new Set(doneDates), [doneDates]);
+  const todayStr = todayKey();
+  const cells = useMemo(() => {
+    const start = new Date();
+    start.setHours(12, 0, 0, 0);
+    start.setDate(start.getDate() - 14);
+    start.setDate(start.getDate() - start.getDay()); // 日曜に合わせる
+    return Array.from({ length: 35 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i);
+      return d;
+    });
+  }, []);
+  const keyOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  let hash = 0;
+  const stampFor = (key: string) => {
+    hash = 0;
+    for (let i = 0; i < key.length; i += 1) hash = (hash * 31 + key.charCodeAt(i)) | 0;
+    return calendarStamps[Math.abs(hash) % calendarStamps.length];
+  };
+  return (
+    <div className="pcal">
+      <div className="pcal-week pcal-head">
+        {["日", "月", "火", "水", "木", "金", "土"].map((wd, i) => <span key={wd} className={i === 0 ? "sun" : ""}>{wd}</span>)}
+      </div>
+      {Array.from({ length: 5 }, (_, row) => (
+        <div className="pcal-week" key={row}>
+          {cells.slice(row * 7, row * 7 + 7).map((d) => {
+            const key = keyOf(d);
+            const isToday = key === todayStr;
+            const isDone = doneSet.has(key);
+            return (
+              <span key={key} className={`pcal-cell${isToday ? " today" : ""}${isDone ? " done" : ""}`}>
+                {isDone
+                  ? <img src={assetUrl(`stamps/${stampFor(key)}.png`)} alt="練習済み" loading="lazy" />
+                  : <small>{d.getDate()}</small>}
+              </span>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function LogView({ log, sessions, meals }: { log: PracticeLog; sessions: AssessmentSession[]; meals: MealRecord[] }) {
   const streak = calculateStreak(log.doneDates);
   const clarityEntries: ClarityHistoryEntry[] = useMemo(() => {
@@ -1544,7 +1594,7 @@ function LogView({ log, sessions, meals }: { log: PracticeLog; sessions: Assessm
     { label: "はじめの一歩", unlocked: log.doneDates.length >= 1 }, { label: "3日連続", unlocked: streak >= 3 },
     { label: "7日連続", unlocked: streak >= 7 }, { label: "合計10日", unlocked: log.doneDates.length >= 10 },
   ];
-  return <section className="view"><div className="page-header"><div><div className="eyebrow">YOUR PROGRESS</div><h1>カレンダー／ログ</h1><p>練習と食事の記録を確認します。</p></div></div><div className="log-grid"><article className="streak-card"><span>現在の連続記録</span><strong>{streak}<small>日</small></strong><p>今日の練習も記録されます</p></article><article className="calendar-card"><div className="card-title"><h2>練習した日</h2><b>{log.doneDates.length}日</b></div><div className="date-cloud">{log.doneDates.length ? log.doneDates.slice().reverse().slice(0, 14).map((date) => <span key={date}>{date.replaceAll("-", "/")}</span>) : <p>練習を終えると、ここに日付が記録されます。</p>}</div></article><article className="time-card"><div className="card-title"><h2>項目別の学習時間</h2><b>合計 {formatMinutes(log.totalMs)}</b></div><div className="time-list">{Object.entries(log.items).sort((a, b) => b[1].totalMs - a[1].totalMs).slice(0, 8).map(([id, item]) => <div key={id}><span>{item.title}</span><i><em style={{ width: `${Math.min(100, (item.totalMs / Math.max(log.totalMs, 1)) * 100 * 2.5)}%` }} /></i><b>{formatMinutes(item.totalMs)}</b></div>)}{!Object.keys(log.items).length && <p>項目を開いて練習すると時間が記録されます。</p>}</div></article><article className="history-card"><div className="card-title"><h2>発音判定の履歴</h2><b>{sessions.length}回</b></div>{sessions.length ? sessions.slice(0, 5).map((session) => <div className="history-row" key={session.date}><span>{new Date(session.date).toLocaleDateString("ja-JP")}</span><b>{session.correct} / {session.total}</b><em>{Math.round((session.correct / session.total) * 100)}%</em></div>) : <p>判定を行うと結果が記録されます。</p>}</article><article className="history-card clarity-card"><div className="card-title"><h2>単語明瞭度テストの結果</h2><b>{clarityEntries.length}件</b></div>{clarityEntries.length ? clarityEntries.map((e, i) => <div className="history-row" key={i}><span>{new Date(e.date).toLocaleDateString("ja-JP")}</span><b>{e.correctCount}/{e.totalCount} 正答</b><em>{e.title}</em></div>) : <p>テストを受けると結果が記録されます。</p>}<p className="tiny-note">※正答には許容範囲の回答を含みます。</p></article><article className="history-card meal-summary-card"><div className="card-title"><h2>食事の日別まとめ（最近14日）</h2><b>{dailyMeals.length}日</b></div>{dailyMeals.length ? dailyMeals.map(([day, v]) => <div className="history-row" key={day}><span>{day.replaceAll("-", "/")}</span><b>約{v.kcal}kcal</b><em>P {v.protein}g</em></div>) : <p>食事記録をつけると集計されます。</p>}<p className="tiny-note">摂取率をかけた概算値です。</p></article></div><div className="badges"><div className="section-heading"><div><span>MILESTONES</span><h2>バッジ</h2></div></div><div>{badges.map((badge) => <span className={badge.unlocked ? "unlocked" : "locked"} key={badge.label}><i>{badge.unlocked ? "★" : "·"}</i>{badge.label}</span>)}</div></div></section>;
+  return <section className="view"><div className="page-header"><div><div className="eyebrow">YOUR PROGRESS</div><h1>カレンダー／ログ</h1><p>練習と食事の記録を確認します。</p></div></div><div className="log-grid"><article className="streak-card"><span>現在の連続記録</span><strong>{streak}<small>日</small></strong><p>今日の練習も記録されます</p></article><article className="calendar-card"><div className="card-title"><h2>練習カレンダー</h2><b>{log.doneDates.length}日</b></div><PracticeCalendar doneDates={log.doneDates} /></article><article className="time-card"><div className="card-title"><h2>項目別の学習時間</h2><b>合計 {formatMinutes(log.totalMs)}</b></div><div className="time-list">{Object.entries(log.items).sort((a, b) => b[1].totalMs - a[1].totalMs).slice(0, 8).map(([id, item]) => <div key={id}><span>{item.title}</span><i><em style={{ width: `${Math.min(100, (item.totalMs / Math.max(log.totalMs, 1)) * 100 * 2.5)}%` }} /></i><b>{formatMinutes(item.totalMs)}</b></div>)}{!Object.keys(log.items).length && <p>項目を開いて練習すると時間が記録されます。</p>}</div></article><article className="history-card"><div className="card-title"><h2>発音判定の履歴</h2><b>{sessions.length}回</b></div>{sessions.length ? sessions.slice(0, 5).map((session) => <div className="history-row" key={session.date}><span>{new Date(session.date).toLocaleDateString("ja-JP")}</span><b>{session.correct} / {session.total}</b><em>{Math.round((session.correct / session.total) * 100)}%</em></div>) : <p>判定を行うと結果が記録されます。</p>}</article><article className="history-card clarity-card"><div className="card-title"><h2>単語明瞭度テストの結果</h2><b>{clarityEntries.length}件</b></div>{clarityEntries.length ? clarityEntries.map((e, i) => <div className="history-row" key={i}><span>{new Date(e.date).toLocaleDateString("ja-JP")}</span><b>{e.correctCount}/{e.totalCount} 正答</b><em>{e.title}</em></div>) : <p>テストを受けると結果が記録されます。</p>}<p className="tiny-note">※正答には許容範囲の回答を含みます。</p></article><article className="history-card meal-summary-card"><div className="card-title"><h2>食事の日別まとめ（最近14日）</h2><b>{dailyMeals.length}日</b></div>{dailyMeals.length ? dailyMeals.map(([day, v]) => <div className="history-row" key={day}><span>{day.replaceAll("-", "/")}</span><b>約{v.kcal}kcal</b><em>P {v.protein}g</em></div>) : <p>食事記録をつけると集計されます。</p>}<p className="tiny-note">摂取率をかけた概算値です。</p></article></div><div className="badges"><div className="section-heading"><div><span>MILESTONES</span><h2>バッジ</h2></div></div><div>{badges.map((badge) => <span className={badge.unlocked ? "unlocked" : "locked"} key={badge.label}><i>{badge.unlocked ? "★" : "·"}</i>{badge.label}</span>)}</div></div></section>;
 }
 
 // ---------------- 設定・ご案内 ----------------
