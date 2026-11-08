@@ -1416,7 +1416,7 @@ function MealRecipeView() {
 }
 
 const mealTypes = ["朝食", "昼食", "夕食", "間食", "水分"];
-const dietCodes = ["指定なし", "0j", "0t", "とろみ1", "とろみ2", "とろみ3", "1-1", "1-2", "2-1", "2-2", "3-1", "3-2", "4"];
+const dietCodes = ["指定なし", "0j", "0t", "とろみ1", "とろみ2", "とろみ3", "1j", "2-1", "2-2", "3", "4"];
 
 function MealRecordView({ onSaved, userName }: { onSaved: () => void; userName: string }) {
   const [records, setRecords] = useState<MealRecord[]>([]);
