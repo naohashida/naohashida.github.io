@@ -172,6 +172,10 @@ const dakutenRemovedMap: Record<string, string> = {
 function toClarityNormalized(value: string): string {
   let s = value.trim()
     .replace(/[ァ-ン]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+  // 音声認識が「まる」を記号（丸印・句点）で返した場合に「まる」として扱う
+  s = s.replaceAll("〇", "まる").replaceAll("○", "まる")
+    .replaceAll("◯", "まる").replaceAll("●", "まる").replaceAll("◎", "まる");
+  if (!s.replace(/[。．.、\s\u3000]/g, "")) s = "まる";
   s = s.replace(/[\s\u3000、。,.!?！？「」『』・'"()（）〜ー\-−~]/g, "");
   for (let i = 0; i < 2; i += 1) {
     s = s.replaceAll("えい", "え").replaceAll("おう", "お").replaceAll("おお", "お");
@@ -891,7 +895,7 @@ function WordClarityTestView({ set, onBack, onFinished }: { set: ClaritySet; onB
             <strong>{correct}<small>/ {results.length} 正答</small></strong>
             <p>※正答には許容範囲の回答を含みます。</p>
             <div className="result-sounds">
-              {results.map((r, i) => <span className={r.judge === "incorrect" ? "retry" : "ok"} key={i}>{r.word.word}<small>{r.judge === "correct" ? "○" : r.judge === "acceptable" ? "△" : "×"}</small></span>)}
+              {results.map((r, i) => <span className={r.judge === "incorrect" ? "retry" : "ok"} key={i}>{r.word.word}<small>{r.judge === "incorrect" ? "×" : "○"}</small></span>)}
             </div>
             <div className="wordtest-buttons">
               <button className="button primary" onClick={startTest}>もう一度</button>
