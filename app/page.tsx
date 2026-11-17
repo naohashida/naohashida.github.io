@@ -9,7 +9,7 @@ import recipesJson from "./data/recipes.json";
 
 type View =
   | "home" | "speech" | "meal" | "practice" | "assessment" | "acoustic" | "submit"
-  | "log" | "mealGuidance" | "mealRecipe" | "mealRecord" | "settings" | "privacy";
+  | "log" | "mealGuidance" | "mealRecipe" | "mealRecord" | "settings" | "tutorial" | "privacy";
 type PracticeBlock = { type: "text" | "image" | "video"; content?: string; resName?: string };
 type PracticeItem = {
   id: string;
@@ -433,13 +433,13 @@ function AudioRecorder({ storageKey, compact = false, onChange }: { storageKey: 
 }
 
 function NavIcon({ name }: { name: View }) {
-  return <span aria-hidden="true">{{ home: "⌂", speech: "あ", meal: "🍚", practice: "あ", assessment: "◎", acoustic: "〜", submit: "⇧", log: "▦", mealGuidance: "📋", mealRecipe: "🥣", mealRecord: "📝", settings: "⚙", privacy: "i" }[name]}</span>;
+  return <span aria-hidden="true">{{ home: "⌂", speech: "あ", meal: "🍚", practice: "あ", assessment: "◎", acoustic: "〜", submit: "⇧", log: "▦", mealGuidance: "📋", mealRecipe: "🥣", mealRecord: "📝", settings: "⚙", tutorial: "?", privacy: "i" }[name]}</span>;
 }
 
 const navItems: { id: View; label: string }[] = [
   { id: "home", label: "ホーム" }, { id: "speech", label: "発音" },
   { id: "meal", label: "食事" }, { id: "log", label: "カレンダー／ログ" },
-  { id: "settings", label: "設定" }, { id: "privacy", label: "ご案内" },
+  { id: "settings", label: "設定" }, { id: "tutorial", label: "使い方" }, { id: "privacy", label: "ご案内" },
 ];
 
 function AndroidDownloadLink({ compact = false }: { compact?: boolean }) {
@@ -503,9 +503,14 @@ function Dashboard({ userName, log, sessions, clarityLog, onGo, onPraise }: {
           {latestClarity && <p>{latestClarity.title}</p>}
         </article>
       </div>
-      <button className="link-with-frog" onClick={onPraise}>
-        <img src={frogUrl("frog_praise_1")} alt="" />カエルさんに「お疲れ様」って言ってもらう
-      </button>
+      <div className="home-links">
+        <button className="link-with-frog" onClick={() => onGo("tutorial")}>
+          <img src={frogUrl("frog_praise_1")} alt="" />使い方（チュートリアル）を見る
+        </button>
+        <button className="link-with-frog" onClick={onPraise}>
+          <img src={frogUrl("frog_praise_1")} alt="" />カエルさんに「お疲れ様」って言ってもらう
+        </button>
+      </div>
       <AndroidDownloadLink />
     </section>
   );
@@ -1702,6 +1707,53 @@ function SettingsView({ userName, onRename }: { userName: string; onRename: (nam
   );
 }
 
+function TutorialView() {
+  const sections: { title: string; lines: string[] }[] = [
+    { title: "1．ホーム画面について", lines: [
+      "ホームには「発音」「食事」「カレンダー／ログ」「設定」の4つのボタンがあります。",
+      "やりたいことを選んで、その中のメニューをクリック（タップ）してください。",
+    ]},
+    { title: "2．発音の使い方", lines: [
+      "【発音練習】大項目 → 中項目 → 小項目の順に選びます。説明文・図・動画で練習します。音が出る項目では録音もできます。画面下の「次へ」で進み、「一覧へ」で終わりです（カエルが褒めてくれます）。「小さく／大きく」で文字サイズを変えられます。",
+      "【単語明瞭度テスト】子音練習の最後にある「〇行のテスト」です。表示されたことばを読み上げると、10問の正答数が判定されます。結果はカレンダー／ログに残ります。",
+      "【発音の判定】25音を1音ずつ読み上げて、聞こえ方を確認します。音声認識はChromeまたはEdgeでお使いください。",
+      "【課題提出】5つの課題を録音して、まとめて共有（ダウンロード＋メール）します。",
+      "【F2・tVSA音響評価】母音を3秒ずつ発声してフォルマントを測ります（簡易な推定値です）。",
+    ]},
+    { title: "3．食事の使い方", lines: [
+      "【嚥下調整食のガイダンス】学会分類2021のコードごとの説明を見られます。",
+      "【嚥下調整食レシピ】コード別の参考レシピ集です。",
+      "【食事記録】食事の内容と摂取率を記録します（カロリー等はご自身で入力する参考値です）。Androidアプリ版には写真のAI解析がありますが、これはアルファ版で誤差があります。",
+      "【筋肉量推定】Androidアプリ版の機能です。ふくらはぎの写真から周囲長を推定しますが、アルファ版で誤差が大きいことがあります。",
+    ]},
+    { title: "4．カレンダー／ログの使い方", lines: [
+      "練習した日はカレンダーにカエルのスタンプが押されます。",
+      "発音の判定や単語テストの結果（日付と点数）、食事の日別まとめもここで確認できます。",
+    ]},
+    { title: "5．データについて", lines: [
+      "記録はこの端末（ブラウザ）の中にだけ保存されます。サーバーへ自動送信しません。",
+      "「設定」からお名前の変更と、データの一括削除ができます。",
+    ]},
+  ];
+  return (
+    <section className="view">
+      <div className="page-header"><div><div className="eyebrow">HOW TO USE</div><h1>使い方（チュートリアル）</h1><p>このアプリの使い方の説明です。</p></div></div>
+      <div className="notice alpha-notice">
+        <b>【大切なお知らせ】</b>食事の管理機能（食事入力のAI解析・カロリーやタンパク質の自動推定、筋肉量測定など）は<b>アルファ版（試験版）</b>です。十分な精度があるわけではないため、あくまで参考値としてご利用ください。正確な評価・食事の判断は、かかりつけ医・言語聴覚士・管理栄養士等の専門職にご相談ください。
+      </div>
+      <div className="guide-list tutorial-list">
+        {sections.map((sec) => (
+          <article className="guide-card" key={sec.title}>
+            <div className="guide-head"><h2>{sec.title}</h2></div>
+            {sec.lines.map((line, i) => <p key={i}>・{line}</p>)}
+          </article>
+        ))}
+      </div>
+      <p className="tiny-note">※このアプリの判定・測定値は、いずれも学習と経過の目安であり、医療上の診断ではありません。</p>
+    </section>
+  );
+}
+
 function PrivacyView() {
   return <section className="view policy-view"><div className="eyebrow">INFORMATION</div><h1>ご利用案内と<br />プライバシー</h1><div className="policy-lead">本アプリは、成人の発音学習・食事の自己管理を支援する教育用Webアプリです。</div><AndroidDownloadLink compact /><div className="policy-grid"><article><span>01</span><h2>マイクの使用</h2><p>録音・発音判定・音響評価を開始したときだけマイクを使用します。ブラウザから許可を求められた場合に、ご自身で選択できます。</p></article><article><span>02</span><h2>データの保存</h2><p>ユーザー名、練習履歴、判定履歴、食事記録、録音音声は、このブラウザの端末内に保存されます。サーバーへ自動送信しません。</p></article><article><span>03</span><h2>課題の共有</h2><p>課題提出や食事記録の共有操作を選んだ場合に限り、端末の共有機能・ダウンロード・メールを使ってデータを送信できます。送信前に内容を確認できます。</p></article><article><span>04</span><h2>大切なお知らせ</h2><p>表示される判定・測定値（発音判定・単語テスト・F2/tVSA・カロリー等）は目安であり、医療上の診断や治療を目的とするものではありません。</p></article></div><div className="contact-card"><div><span>CONTACT</span><h2>お問い合わせ</h2></div><a href="mailto:hashida1223@gmail.com">hashida1223@gmail.com →</a></div></section>;
 }
@@ -1787,6 +1839,7 @@ export default function Home() {
         {view === "mealRecipe" && <MealRecipeView />}
         {view === "mealRecord" && <MealRecordView onSaved={() => { saveMealList(readJson<MealRecord[]>("articulation:meals", [])); showPraise(); }} userName={userName} />}
         {view === "settings" && <SettingsView userName={userName} onRename={setUserName} />}
+        {view === "tutorial" && <TutorialView />}
         {view === "privacy" && <PrivacyView />}
       </main>
       <nav className="bottom-nav">{navItems.slice(0, 5).map((item) => <button className={view === item.id ? "active" : ""} onClick={() => setView(item.id)} key={item.id}><NavIcon name={item.id} /><small>{item.label}</small></button>)}</nav>
