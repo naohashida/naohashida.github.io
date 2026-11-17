@@ -352,3 +352,8 @@ h1, h2, h3, b, strong, button, .button, .eyebrow, .lesson-title, .chip, .sidebar
 .alpha-notice b { color: #B33F00; }
 .tutorial-list { grid-template-columns: 1fr; }
 .home-links { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 20px; }
+
+/* チュートリアル画像ステップ */
+.tut-step { margin-top: 14px; display: grid; gap: 8px; }
+.tut-caption { font-size: 13px; line-height: 1.8; margin: 0; font-weight: 700; }
+.tut-img { width: 100%; max-width: 560px; border-radius: 12px; border: 1px solid var(--line); display: block; }

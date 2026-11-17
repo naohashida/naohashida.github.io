@@ -1708,17 +1708,21 @@ function SettingsView({ userName, onRename }: { userName: string; onRename: (nam
 }
 
 function TutorialView() {
-  const sections: { title: string; lines: string[] }[] = [
+  const sections: { title: string; lines: string[]; steps?: { step: string; caption: string; img: string | null }[] }[] = [
     { title: "1．ホーム画面について", lines: [
       "ホームには「発音」「食事」「カレンダー／ログ」「設定」の4つのボタンがあります。",
       "やりたいことを選んで、その中のメニューをクリック（タップ）してください。",
     ]},
-    { title: "2．発音の使い方", lines: [
-      "【発音練習】大項目 → 中項目 → 小項目の順に選びます。説明文・図・動画で練習します。音が出る項目では録音もできます。画面下の「次へ」で進み、「一覧へ」で終わりです（カエルが褒めてくれます）。「小さく／大きく」で文字サイズを変えられます。",
-      "【単語明瞭度テスト】子音練習の最後にある「〇行のテスト」です。表示されたことばを読み上げると、10問の正答数が判定されます。結果はカレンダー／ログに残ります。",
-      "【発音の判定】25音を1音ずつ読み上げて、聞こえ方を確認します。音声認識はChromeまたはEdgeでお使いください。",
-      "【課題提出】5つの課題を録音して、まとめて共有（ダウンロード＋メール）します。",
-      "【F2・tVSA音響評価】母音を3秒ずつ発声してフォルマントを測ります（簡易な推定値です）。",
+    { title: "2．発音の使い方（画像付きの手順）", lines: [], steps: [
+      { step: "①", caption: "ホームの「発音」を開きます。", img: "tut_home" },
+      { step: "②", caption: "メニューから「発音練習」を開きます。", img: "tut_speech_menu" },
+      { step: "③", caption: "大項目（例：子音練習）を選びます。", img: "tut_practice_cat" },
+      { step: "④", caption: "中項目（例：タ行）を選びます。", img: "tut_practice_group" },
+      { step: "⑤", caption: "小項目（例：「た」の出し方）を選びます。", img: "tut_practice_items" },
+      { step: "⑥", caption: "説明と絵・動画を見て練習します。「次へ」で次の項目へ、「一覧へ」で終わりです（カエルが褒めてくれます）。「小さく／大きく」で文字サイズを変えられます。", img: "tut_practice_detail" },
+      { step: "⑦", caption: "【単語明瞭度テスト】小項目の最後にある「〇行のテスト」→「テストを始める」で、表示されたことばを読み上げます（10問）。結果はカレンダー／ログに残ります。", img: "tut_wordtest" },
+      { step: "⑧", caption: "【発音の判定】メニューの「発音の判定」→「判定をはじめる」で、25音を1音ずつ読み上げます。音声認識はChromeまたはEdgeでお使いください。", img: "tut_assessment" },
+      { step: "その他", caption: "【課題提出】5つの課題を録音して、まとめて共有（ダウンロード＋メール）します。【F2・tVSA音響評価】母音を3秒ずつ発声してフォルマントを測ります（簡易な推定値です）。", img: null },
     ]},
     { title: "3．食事の使い方", lines: [
       "【嚥下調整食のガイダンス】学会分類2021のコードごとの説明を見られます。",
@@ -1746,6 +1750,12 @@ function TutorialView() {
           <article className="guide-card" key={sec.title}>
             <div className="guide-head"><h2>{sec.title}</h2></div>
             {sec.lines.map((line, i) => <p key={i}>・{line}</p>)}
+            {sec.steps?.map((st) => (
+              <div className="tut-step" key={st.step}>
+                <p className="tut-caption">{st.step} {st.caption}</p>
+                {st.img && <img className="tut-img" src={assetUrl(`tutorial/${st.img}.png`)} alt={st.caption} loading="lazy" />}
+              </div>
+            ))}
           </article>
         ))}
       </div>
