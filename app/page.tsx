@@ -725,6 +725,7 @@ function WordClarityTestView({ set, onBack, onFinished }: { set: ClaritySet; onB
   const retryRef = useRef(0);
   const resolvedRef = useRef(true);
   const recRef = useRef<BrowserSpeechRecognition | null>(null);
+  const watchdogRef = useRef<number | null>(null);
   const finished = questions.length > 0 && results.length === questions.length;
 
   useEffect(() => {
@@ -757,6 +758,7 @@ function WordClarityTestView({ set, onBack, onFinished }: { set: ClaritySet; onB
     const word = qRef.current[iRef.current];
     if (!word) return;
     resolvedRef.current = true;
+    if (watchdogRef.current !== null) { window.clearTimeout(watchdogRef.current); watchdogRef.current = null; }
     listeningRef.current = false;
     setListening(false);
     setNeedsRetry(false);
@@ -784,6 +786,7 @@ function WordClarityTestView({ set, onBack, onFinished }: { set: ClaritySet; onB
 
   const markRetry = useCallback((msg: string) => {
     resolvedRef.current = true;
+    if (watchdogRef.current !== null) { window.clearTimeout(watchdogRef.current); watchdogRef.current = null; }
     listeningRef.current = false;
     setListening(false);
     setNeedsRetry(true);
@@ -814,6 +817,8 @@ function WordClarityTestView({ set, onBack, onFinished }: { set: ClaritySet; onB
     const scope = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
     const Constructor = scope.SpeechRecognition || scope.webkitSpeechRecognition;
     if (!Constructor) { markRetry("このブラウザでは音声認識を利用できません。"); return; }
+    // 既存の認識が残っている場合は先に止める（already startedエラー防止）
+    try { recRef.current?.abort(); } catch { /* noop */ }
     const recognition = new Constructor();
     recRef.current = recognition;
     partialRef.current = [];
@@ -823,6 +828,19 @@ function WordClarityTestView({ set, onBack, onFinished }: { set: ClaritySet; onB
     setListening(true);
     setNeedsRetry(false);
     setMessage("マイクの準備をしています…");
+    // 全体ウォッチドッグ：認識が始まらない／終わらない場合の固まり防止
+    if (watchdogRef.current !== null) window.clearTimeout(watchdogRef.current);
+    watchdogRef.current = window.setTimeout(() => {
+      if (resolvedRef.current) return;
+      resolvedRef.current = true;
+      try { recognition.abort(); } catch { /* noop */ }
+      listeningRef.current = false;
+      setListening(false);
+      setNeedsRetry(true);
+      partialRef.current = [];
+      detectedRef.current = false;
+      setMessage("音声認識の応答がありませんでした。もう一度録音してください。");
+    }, 12000);
     recognition.lang = "ja-JP";
     recognition.interimResults = true;
     recognition.continuous = false;
@@ -871,7 +889,23 @@ function WordClarityTestView({ set, onBack, onFinished }: { set: ClaritySet; onB
     return () => window.clearTimeout(timer);
   }, [attempt, finished, index, listen, listening, needsRetry, questions.length]);
 
-  useEffect(() => () => { resolvedRef.current = true; recRef.current?.abort(); }, []);
+  useEffect(() => () => {
+    resolvedRef.current = true;
+    if (watchdogRef.current !== null) window.clearTimeout(watchdogRef.current);
+    recRef.current?.abort();
+  }, []);
+
+  const cancelListening = useCallback(() => {
+    resolvedRef.current = true;
+    if (watchdogRef.current !== null) { window.clearTimeout(watchdogRef.current); watchdogRef.current = null; }
+    try { recRef.current?.abort(); } catch { /* noop */ }
+    listeningRef.current = false;
+    setListening(false);
+    partialRef.current = [];
+    detectedRef.current = false;
+    setNeedsRetry(true);
+    setMessage("録音を停止しました。もう一度録音してください。");
+  }, []);
 
   const correct = results.filter((r) => r.judge !== "incorrect").length;
   return (
@@ -907,8 +941,8 @@ function WordClarityTestView({ set, onBack, onFinished }: { set: ClaritySet; onB
             <div className="assessment-topline"><span>{index + 1} / {questions.length}</span><div><i style={{ width: `${((index + 1) / questions.length) * 100}%` }} /></div></div>
             <p className="assessment-prompt">このことばを発音してください</p>
             <div className="target-word">{questions[index].word}</div>
-            <button className={`listen-button ${listening ? "listening" : ""}`} onClick={() => { retryRef.current = 0; listen(); }} disabled={listening || !needsRetry}>
-              <span>●</span>{listening ? "聞いています" : needsRetry ? "もう一度録音" : "自動録音を準備中"}
+            <button className={`listen-button ${listening ? "listening" : ""}`} onClick={() => { if (listening) { cancelListening(); return; } retryRef.current = 0; listen(); }} disabled={!listening && !needsRetry}>
+              <span>●</span>{listening ? "聞いています（停止する）" : needsRetry ? "もう一度録音" : "自動録音を準備中"}
             </button>
             <p className="assessment-message">{message}</p>
           </div>
@@ -1068,6 +1102,8 @@ function AssessmentView({ onSaved, onFinished }: { onSaved: (session: Assessment
       return;
     }
 
+    // 既存の認識が残っている場合は先に止める（already startedエラー防止）
+    try { recognitionRef.current?.abort(); } catch { /* noop */ }
     const recognition = new Constructor();
     recognitionRef.current = recognition;
     if (resetRetryCount) retryCountRef.current = 0;
@@ -1079,6 +1115,21 @@ function AssessmentView({ onSaved, onFinished }: { onSaved: (session: Assessment
     setRecognitionReady(false);
     setNeedsRetry(false);
     setMessage("マイクを準備しています。少しお待ちください。");
+
+    // 全体ウォッチドッグ：認識が始まらない／終わらない場合の固まり防止
+    clearNoResultTimer();
+    noResultTimerRef.current = window.setTimeout(() => {
+      if (attemptResolvedRef.current) return;
+      attemptResolvedRef.current = true;
+      try { recognition.abort(); } catch { /* noop */ }
+      listeningRef.current = false;
+      setListening(false);
+      setRecognitionReady(false);
+      setNeedsRetry(true);
+      partialCandidatesRef.current = [];
+      detectedSpeechRef.current = false;
+      setMessage("音声認識の応答がありませんでした。もう一度録音してください。");
+    }, 12000);
 
     const beginNoResultTimer = () => {
       detectedSpeechRef.current = true;
@@ -1189,11 +1240,24 @@ function AssessmentView({ onSaved, onFinished }: { onSaved: (session: Assessment
     return () => window.clearTimeout(timer);
   }, [attemptVersion, finished, index, listen, listening, needsRetry, sounds.length]);
 
+  const cancelListening = useCallback(() => {
+    attemptResolvedRef.current = true;
+    clearNoResultTimer();
+    try { recognitionRef.current?.abort(); } catch { /* noop */ }
+    listeningRef.current = false;
+    setListening(false);
+    setRecognitionReady(false);
+    partialCandidatesRef.current = [];
+    detectedSpeechRef.current = false;
+    setNeedsRetry(true);
+    setMessage("録音を停止しました。もう一度録音してください。");
+  }, [clearNoResultTimer]);
+
   const correctCount = results.filter((result) => result.correct).length;
   return (
     <section className="view assessment-view">
       <div className="page-header"><div><div className="eyebrow">VOICE CHECK</div><h1>発音の判定</h1><p>音声認識を使って、25音の聞こえ方を確認します。</p></div></div>
-      {!sounds.length ? <div className="assessment-intro"><div className="assessment-mark">◎</div><h2>声の現在地を確認しましょう</h2><p>結果は医療上の診断ではなく、練習のための目安です。静かな場所で、マイクの使用を許可してください。</p>{!supported && <div className="notice">このブラウザは音声判定に対応していません。ChromeまたはEdgeでお試しください。</div>}<button className="button primary" disabled={!supported} onClick={startAssessment}>判定をはじめる</button></div> : finished ? <div className="result-card"><span>今回の結果</span><strong>{Math.round((correctCount / results.length) * 100)}<small>%</small></strong><p>{results.length}音中 {correctCount}音を認識できました</p><div className="result-sounds">{results.map((result) => <span className={result.correct ? "ok" : "retry"} key={result.target}>{result.target}<small>{result.correct ? "○" : "△"}</small></span>)}</div><button className="button primary" onClick={startAssessment}>もう一度判定する</button></div> : <div className="assessment-stage"><div className="assessment-topline"><span>{index + 1} / {sounds.length}</span><div><i style={{ width: `${((index + 1) / sounds.length) * 100}%` }} /></div></div><p className="assessment-prompt">この音を発音してください</p><div className="target-sound">{sounds[index]}</div><button className={`listen-button ${listening ? "listening" : ""}`} onClick={() => listen(true)} disabled={listening || !needsRetry}><span>{listening ? recognitionReady ? "•••" : "…" : needsRetry ? "●" : "…"}</span>{listening ? recognitionReady ? "聞いています" : "マイク準備中" : needsRetry ? "もう一度録音" : "自動録音を準備中"}</button><p className="assessment-message">{message}</p><button className="button ghost" onClick={startAssessment} disabled={listening}>最初からやり直す</button></div>}
+      {!sounds.length ? <div className="assessment-intro"><div className="assessment-mark">◎</div><h2>声の現在地を確認しましょう</h2><p>結果は医療上の診断ではなく、練習のための目安です。静かな場所で、マイクの使用を許可してください。</p>{!supported && <div className="notice">このブラウザは音声判定に対応していません。ChromeまたはEdgeでお試しください。</div>}<button className="button primary" disabled={!supported} onClick={startAssessment}>判定をはじめる</button></div> : finished ? <div className="result-card"><span>今回の結果</span><strong>{Math.round((correctCount / results.length) * 100)}<small>%</small></strong><p>{results.length}音中 {correctCount}音を認識できました</p><div className="result-sounds">{results.map((result) => <span className={result.correct ? "ok" : "retry"} key={result.target}>{result.target}<small>{result.correct ? "○" : "△"}</small></span>)}</div><button className="button primary" onClick={startAssessment}>もう一度判定する</button></div> : <div className="assessment-stage"><div className="assessment-topline"><span>{index + 1} / {sounds.length}</span><div><i style={{ width: `${((index + 1) / sounds.length) * 100}%` }} /></div></div><p className="assessment-prompt">この音を発音してください</p><div className="target-sound">{sounds[index]}</div><button className={`listen-button ${listening ? "listening" : ""}`} onClick={() => (listening ? cancelListening() : listen(true))} disabled={!listening && !needsRetry}><span>{listening ? recognitionReady ? "•••" : "…" : needsRetry ? "●" : "…"}</span>{listening ? (recognitionReady ? "聞いています（停止する）" : "マイク準備中（停止する）") : needsRetry ? "もう一度録音" : "自動録音を準備中"}</button><p className="assessment-message">{message}</p><button className="button ghost" onClick={startAssessment} disabled={listening}>最初からやり直す</button></div>}
     </section>
   );
 }
