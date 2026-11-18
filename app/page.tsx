@@ -505,7 +505,7 @@ function Dashboard({ userName, log, sessions, clarityLog, onGo, onPraise }: {
       </div>
       <div className="home-links">
         <button className="link-with-frog" onClick={() => onGo("tutorial")}>
-          <img src={frogUrl("frog_praise_1")} alt="" />使い方（チュートリアル）を見る
+          <img src={frogUrl("frog_praise_1")} alt="" />使い方を見る
         </button>
         <button className="link-with-frog" onClick={onPraise}>
           <img src={frogUrl("frog_praise_1")} alt="" />カエルさんに「お疲れ様」って言ってもらう
@@ -1708,58 +1708,40 @@ function SettingsView({ userName, onRename }: { userName: string; onRename: (nam
 }
 
 function TutorialView() {
-  const sections: { title: string; lines: string[]; steps?: { step: string; caption: string; img: string | null }[] }[] = [
-    { title: "1．ホーム画面について", lines: [
-      "ホームには「発音」「食事」「カレンダー／ログ」「設定」の4つのボタンがあります。",
-      "やりたいことを選んで、その中のメニューをクリック（タップ）してください。",
-    ]},
-    { title: "2．発音の使い方（画像付きの手順）", lines: [], steps: [
-      { step: "①", caption: "ホームの「発音」を開きます。", img: "tut_home" },
-      { step: "②", caption: "メニューから「発音練習」を開きます。", img: "tut_speech_menu" },
-      { step: "③", caption: "大項目（例：子音練習）を選びます。", img: "tut_practice_cat" },
-      { step: "④", caption: "中項目（例：タ行）を選びます。", img: "tut_practice_group" },
-      { step: "⑤", caption: "小項目（例：「た」の出し方）を選びます。", img: "tut_practice_items" },
-      { step: "⑥", caption: "説明と絵・動画を見て練習します。「次へ」で次の項目へ、「一覧へ」で終わりです（カエルが褒めてくれます）。「小さく／大きく」で文字サイズを変えられます。", img: "tut_practice_detail" },
-      { step: "⑦", caption: "【単語明瞭度テスト】小項目の最後にある「〇行のテスト」→「テストを始める」で、表示されたことばを読み上げます（10問）。結果はカレンダー／ログに残ります。", img: "tut_wordtest" },
-      { step: "⑧", caption: "【発音の判定】メニューの「発音の判定」→「判定をはじめる」で、25音を1音ずつ読み上げます。音声認識はChromeまたはEdgeでお使いください。", img: "tut_assessment" },
-      { step: "その他", caption: "【課題提出】5つの課題を録音して、まとめて共有（ダウンロード＋メール）します。【F2・tVSA音響評価】母音を3秒ずつ発声してフォルマントを測ります（簡易な推定値です）。", img: null },
-    ]},
-    { title: "3．食事の使い方", lines: [
-      "【嚥下調整食のガイダンス】学会分類2021のコードごとの説明を見られます。",
-      "【嚥下調整食レシピ】コード別の参考レシピ集です。",
-      "【食事記録】食事の内容と摂取率を記録します（カロリー等はご自身で入力する参考値です）。Androidアプリ版には写真のAI解析がありますが、これはアルファ版で誤差があります。",
-      "【筋肉量推定】Androidアプリ版の機能です。ふくらはぎの写真から周囲長を推定しますが、アルファ版で誤差が大きいことがあります。",
-    ]},
-    { title: "4．カレンダー／ログの使い方", lines: [
-      "練習した日はカレンダーにカエルのスタンプが押されます。",
-      "発音の判定や単語テストの結果（日付と点数）、食事の日別まとめもここで確認できます。",
-    ]},
-    { title: "5．データについて", lines: [
-      "記録はこの端末（ブラウザ）の中にだけ保存されます。サーバーへ自動送信しません。",
-      "「設定」からお名前の変更と、データの一括削除ができます。",
-    ]},
-  ];
+  const pages = useMemo(() => ([
+    { headline: "このアプリでできること", body: "「発音」の練習と判定、「食事」の記録、「カレンダー／ログ」で記録の確認ができます。\n\nはじめに大事なお知らせがあります。次へ進んでください。", img: "tut_home" },
+    { headline: "【大切なお知らせ】食事の管理機能はアルファ版です", body: "食事入力のAI解析・カロリーやタンパク質の自動推定、筋肉量測定などはアルファ版（試験版）で、十分な精度はありません。参考値としてご利用ください。\n\n正確な評価は、かかりつけ医・言語聴覚士・管理栄養士等の専門職にご相談ください。", img: null, notice: true },
+    { headline: "① ホームの「発音」を開く", body: "練習をするときは、まず緑の「発音」ボタンを押します。", img: "tut_home" },
+    { headline: "② 「発音練習」を選ぶ", body: "メニューが表示されます。「発音練習」を押します。", img: "tut_speech_menu" },
+    { headline: "③ 大項目を選ぶ", body: "練習の種類（大項目）を選びます。例では「子音練習」を選びます。", img: "tut_practice_cat" },
+    { headline: "④ 中項目を選ぶ", body: "練習したい音の行（中項目）を選びます。例では「タ行」を選びます。", img: "tut_practice_group" },
+    { headline: "⑤ 小項目を選ぶ", body: "具体的な練習（小項目）を選びます。例では「た」の出し方を選びます。", img: "tut_practice_items" },
+    { headline: "⑥ 見て、まねして、練習", body: "説明と絵・動画を見て練習します。\n・「次へ」で次の項目へ\n・「一覧へ」で終わり（カエルが褒めてくれます）\n・「小さく／大きく」で文字サイズを変えられます\n・音が出る項目では録音もできます", img: "tut_practice_detail" },
+    { headline: "⑦ 単語明瞭度テスト", body: "小項目の最後にある「〇行のテスト」を開き、「テストを始める」を押します。表示されたことばを読み上げると、10問の正答数が判定されます。結果はカレンダー／ログに残ります。", img: "tut_wordtest" },
+    { headline: "⑧ 発音の判定（25音）", body: "メニューの「発音の判定」→「判定をはじめる」で、25音を1音ずつ読み上げて聞こえ方を確認します。音声認識はChromeまたはEdgeでお使いください。", img: "tut_assessment" },
+    { headline: "その他の機能", body: "【課題提出】5つの課題を録音して共有します。\n【F2・tVSA音響評価】母音を発声してフォルマントを測ります（推定値）。\n【食事】ガイダンス・レシピ・食事記録（アルファ版）。\n【カレンダー／ログ】練習した日にカエルのスタンプが押されます。\n【設定】お名前の変更・データ削除。\n\nいつでもホームの「使い方」から、この説明をもう一度見られます。", img: null },
+  ]), []);
+  const [page, setPage] = useState(0);
+  const total = pages.length;
+  const current = pages[page];
   return (
     <section className="view">
-      <div className="page-header"><div><div className="eyebrow">HOW TO USE</div><h1>使い方（チュートリアル）</h1><p>このアプリの使い方の説明です。</p></div></div>
-      <div className="notice alpha-notice">
-        <b>【大切なお知らせ】</b>食事の管理機能（食事入力のAI解析・カロリーやタンパク質の自動推定、筋肉量測定など）は<b>アルファ版（試験版）</b>です。十分な精度があるわけではないため、あくまで参考値としてご利用ください。正確な評価・食事の判断は、かかりつけ医・言語聴覚士・管理栄養士等の専門職にご相談ください。
+      <div className="page-header"><div><div className="eyebrow">HOW TO USE</div><h1>使い方</h1><p>画面の写真を見ながら、使い方を確認できます。</p></div></div>
+      <div className="walk-progress">
+        <span>{page + 1} / {total}</span>
+        <i><em style={{ width: `${((page + 1) / total) * 100}%` }} /></i>
       </div>
-      <div className="guide-list tutorial-list">
-        {sections.map((sec) => (
-          <article className="guide-card" key={sec.title}>
-            <div className="guide-head"><h2>{sec.title}</h2></div>
-            {sec.lines.map((line, i) => <p key={i}>・{line}</p>)}
-            {sec.steps?.map((st) => (
-              <div className="tut-step" key={st.step}>
-                <p className="tut-caption">{st.step} {st.caption}</p>
-                {st.img && <img className="tut-img" src={assetUrl(`tutorial/${st.img}.png`)} alt={st.caption} loading="lazy" />}
-              </div>
-            ))}
-          </article>
-        ))}
+      <article className={`walk-card${current.notice ? " notice-card" : ""}`}>
+        <h2>{current.headline}</h2>
+        <p>{current.body}</p>
+        {current.img && <img className="tut-img" src={assetUrl(`tutorial/${current.img}.png`)} alt={current.headline} />}
+      </article>
+      <div className="walk-nav">
+        <button className="button ghost" disabled={page === 0} onClick={() => setPage(page - 1)}>← 前へ</button>
+        {page < total - 1
+          ? <button className="button primary" onClick={() => setPage(page + 1)}>次へ →</button>
+          : <button className="button primary" onClick={() => setPage(0)}>最初に戻る</button>}
       </div>
-      <p className="tiny-note">※このアプリの判定・測定値は、いずれも学習と経過の目安であり、医療上の診断ではありません。</p>
     </section>
   );
 }
@@ -1824,7 +1806,10 @@ export default function Home() {
 
   function confirmName() {
     const name = draftName.trim(); if (!name) return; localStorage.setItem("articulation:user", name); setUserName(name);
+    if (!localStorage.getItem("articulation:tutorial_prompted")) setShowTutorialInvite(true);
   }
+
+  const [showTutorialInvite, setShowTutorialInvite] = useState(false);
 
   const title = useMemo(() => navItems.find((item) => item.id === view)?.label || "ホーム", [view]);
   if (!ready) return <main className="loading-screen">発音練習・食事の自己管理を準備しています…</main>;
@@ -1854,6 +1839,26 @@ export default function Home() {
       </main>
       <nav className="bottom-nav">{navItems.slice(0, 5).map((item) => <button className={view === item.id ? "active" : ""} onClick={() => setView(item.id)} key={item.id}><NavIcon name={item.id} /><small>{item.label}</small></button>)}</nav>
       <PraisePopup show={praise} onClose={() => setPraise(false)} />
+      {showTutorialInvite && (
+        <div className="onboarding-backdrop">
+          <div className="onboarding tutorial-invite">
+            <img src={assetUrl("frogs/frog_mascot.png")} alt="" />
+            <h1>使い方を見ますか？</h1>
+            <p>はじめてご利用の方のために、画面の写真付きで使い方を説明します。（約11ページ・いつでも中断できます）</p>
+            <div className="tutorial-invite-buttons">
+              <button className="button primary" onClick={() => {
+                localStorage.setItem("articulation:tutorial_prompted", "1");
+                setShowTutorialInvite(false);
+                setView("tutorial");
+              }}>見る</button>
+              <button className="button ghost" onClick={() => {
+                localStorage.setItem("articulation:tutorial_prompted", "1");
+                setShowTutorialInvite(false);
+              }}>今は見ない</button>
+            </div>
+          </div>
+        </div>
+      )}
       {!userName && <div className="onboarding-backdrop"><div className="onboarding"><img src={assetUrl("app-icon.png")} alt="発音練習・食事の自己管理" /><h1>発音練習・食事の自己管理</h1><p>記録をこの端末に保存するため、最初にお名前を設定してください。</p><label>お名前またはニックネーム<input autoFocus value={draftName} onChange={(event) => setDraftName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && confirmName()} placeholder="例：はしだ" /></label><button className="button primary" onClick={confirmName} disabled={!draftName.trim()}>はじめる</button><small>入力した名前はこの端末内だけに保存されます。</small></div></div>}
     </div>
   );

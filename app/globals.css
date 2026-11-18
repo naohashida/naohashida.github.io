@@ -357,3 +357,19 @@ h1, h2, h3, b, strong, button, .button, .eyebrow, .lesson-title, .chip, .sidebar
 .tut-step { margin-top: 14px; display: grid; gap: 8px; }
 .tut-caption { font-size: 13px; line-height: 1.8; margin: 0; font-weight: 700; }
 .tut-img { width: 100%; max-width: 560px; border-radius: 12px; border: 1px solid var(--line); display: block; }
+
+/* 1画面1ステップのウォークスルー */
+.walk-progress { display: flex; align-items: center; gap: 14px; margin: 22px 0 14px; }
+.walk-progress > span { font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.walk-progress i { flex: 1; height: 6px; background: var(--paper-deep); border-radius: 9px; overflow: hidden; }
+.walk-progress em { display: block; height: 100%; background: var(--teal); transition: width .3s ease; }
+.walk-card { background: var(--white); border: 1px solid var(--line); border-radius: 18px; padding: 26px; }
+.walk-card h2 { margin: 0 0 12px; font-size: 22px; }
+.walk-card p { white-space: pre-line; line-height: 2; font-size: 15px; margin: 0; }
+.walk-card .tut-img { margin-top: 18px; }
+.walk-card.notice-card { background: #FFF3E0; border-color: #E65100; }
+.walk-card.notice-card h2 { color: #B33F00; }
+.walk-nav { display: flex; gap: 12px; justify-content: flex-end; margin-top: 18px; }
+.tutorial-invite img { width: 90px; height: 90px; object-fit: contain; margin-bottom: 12px; }
+.tutorial-invite-buttons { display: flex; gap: 10px; margin-top: 16px; }
+.tutorial-invite-buttons .button { flex: 1; }
