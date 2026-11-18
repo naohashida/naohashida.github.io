@@ -1784,6 +1784,7 @@ export default function Home() {
     const savedLog = readJson("articulation:practice-log", defaultLog);
     if (savedLog.todayKey !== todayKey()) { savedLog.todayKey = todayKey(); savedLog.todayMs = 0; }
     setLog(savedLog); setSessions(readJson("articulation:assessments", [])); setMeals(readJson("articulation:meals", [])); setReady(true);
+    if (!localStorage.getItem("articulation:tutorial_prompted")) setShowTutorialInvite(true);
     if ("serviceWorker" in navigator) navigator.serviceWorker.register(assetUrl("sw.js")).catch(() => undefined);
   }, []);
 
