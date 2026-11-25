@@ -1711,11 +1711,11 @@ function TutorialView() {
   const pages = useMemo(() => ([
     { headline: "このアプリでできること", body: "「発音」の練習と判定、「食事」の記録、「カレンダー／ログ」で記録の確認ができます。\n\nはじめに大事なお知らせがあります。次へ進んでください。", img: "tut_home" },
     { headline: "【大切なお知らせ】食事の管理機能はアルファ版です", body: "食事入力のAI解析・カロリーやタンパク質の自動推定、筋肉量測定などはアルファ版（試験版）で、十分な精度はありません。参考値としてご利用ください。\n\n正確な評価は、かかりつけ医・言語聴覚士・管理栄養士等の専門職にご相談ください。", img: null, notice: true },
-    { headline: "① ホームの「発音」を開く", body: "発音の練習をするときは、まず緑の「発音」ボタンを押します。", img: "tut_home" },
-    { headline: "② 「発音練習」を選ぶ", body: "メニューが表示されます。\n課題提出ボタンで発音課題のメール送信、発音の判定ボタンで単音の発音の評価が、F2・tVSA音響評価で音響分析での母音の発音能力が、発音練習ボタンで実際に発音の練習ができます。\n\n発音練習をするときは「発音練習」ボタンを押します。", img: "tut_speech_menu" },
-    { headline: "③ 大項目を選ぶ", body: "様々な項目があります。必要な内容を選んでください。順番にやっても、好きな項目だけやっても構いません。\n\n例では「子音練習」を選びます。", img: "tut_practice_cat" },
+    { headline: "① ホームの「発音」を開く", body: "練習をするときは、まず緑の「発音」ボタンを押します。", img: "tut_home" },
+    { headline: "② 「発音練習」を選ぶ", body: "メニューが表示されます。「発音練習」を押します。", img: "tut_speech_menu" },
+    { headline: "③ 大項目を選ぶ", body: "練習の種類（大項目）を選びます。例では「子音練習」を選びます。", img: "tut_practice_cat" },
     { headline: "④ 中項目を選ぶ", body: "練習したい音の行（中項目）を選びます。例では「タ行」を選びます。", img: "tut_practice_group" },
-    { headline: "⑤ 小項目を選ぶ", body: "「た」の出し方の説明や、実際に単音や単語での練習があります。順番にやっても、必要な内容だけしても構いませんが、初めは順番にやってみましょう。\n\n例では「た」の出し方を選びます。", img: "tut_practice_items" },
+    { headline: "⑤ 小項目を選ぶ", body: "具体的な練習（小項目）を選びます。例では「た」の出し方を選びます。", img: "tut_practice_items" },
     { headline: "⑥ 見て、まねして、練習", body: "説明と絵・動画を見て練習します。\n・「次へ」で次の項目へ\n・「一覧へ」で終わり（カエルが褒めてくれます）\n・「小さく／大きく」で文字サイズを変えられます\n・音が出る項目では録音もできます", img: "tut_practice_detail" },
     { headline: "⑦ 単語明瞭度テスト", body: "小項目の最後にある「〇行のテスト」を開き、「テストを始める」を押します。表示されたことばを読み上げると、10問の正答数が判定されます。結果はカレンダー／ログに残ります。", img: "tut_wordtest" },
     { headline: "⑧ 発音の判定（25音）", body: "メニューの「発音の判定」→「判定をはじめる」で、25音を1音ずつ読み上げて聞こえ方を確認します。音声認識はChromeまたはEdgeでお使いください。", img: "tut_assessment" },
@@ -1853,12 +1853,9 @@ export default function Home() {
                 setView("tutorial");
               }}>見る</button>
               <button className="button ghost" onClick={() => {
-                setShowTutorialInvite(false);
-              }}>今は見ない</button>
-              <button className="button ghost" onClick={() => {
                 localStorage.setItem("articulation:tutorial_prompted", "1");
                 setShowTutorialInvite(false);
-              }}>今後見ない</button>
+              }}>今は見ない</button>
             </div>
           </div>
         </div>
